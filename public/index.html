@@ -1,0 +1,1224 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>公众号智能体面板</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --line: #d9e2ec;
+      --text: #17202a;
+      --muted: #607086;
+      --brand: #0f8b8d;
+      --brand2: #146c94;
+      --warn: #b45309;
+      --danger: #b91c1c;
+      --ok: #047857;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-size: 14px;
+    }
+    header {
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 22px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+    .brand { font-weight: 800; font-size: 17px; }
+    .status { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; }
+    .dot.ok { background: var(--ok); }
+    main {
+      display: grid;
+      grid-template-columns: 360px minmax(420px, 1fr) 420px;
+      gap: 14px;
+      padding: 14px;
+      height: calc(100vh - 56px);
+    }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      min-height: 0;
+    }
+    .section-head {
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      border-bottom: 1px solid var(--line);
+      font-weight: 700;
+    }
+    .body { padding: 14px; overflow: auto; height: calc(100% - 44px); }
+    label { display: block; font-size: 12px; font-weight: 700; color: var(--muted); margin: 12px 0 6px; }
+    input, textarea, select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 9px 10px;
+      font: inherit;
+      color: var(--text);
+      background: #fff;
+      outline: none;
+    }
+    textarea { min-height: 98px; resize: vertical; line-height: 1.65; }
+    input:focus, textarea:focus, select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(15,139,141,.12); }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    button {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      border-radius: 7px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 13px;
+    }
+    button.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+    button.publish { background: var(--brand2); border-color: var(--brand2); color: #fff; }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    .hint { color: var(--muted); font-size: 12px; line-height: 1.6; margin-top: 8px; }
+    .editor-title { font-size: 24px; font-weight: 800; padding: 10px 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; }
+    .editor-summary { min-height: 66px; }
+    #markdown { min-height: 430px; font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; }
+    .preview {
+      max-width: 650px;
+      margin: 0 auto;
+      padding: 8px 8px 40px;
+      color: #263238;
+    }
+    .preview h2 { margin: 26px 0 12px; padding-left: 10px; border-left: 4px solid #0ea5e9; color: #0f172a; font-size: 19px; }
+    .preview h3 { margin: 22px 0 10px; color: #155e75; font-size: 17px; }
+    .preview p { margin: 12px 0; line-height: 1.9; font-size: 15px; }
+    .preview blockquote { margin: 16px 0; padding: 12px 14px; background: #f0f9ff; border-left: 4px solid #38bdf8; color: #334155; }
+    .cover-box {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #eef6f7;
+    }
+    canvas { display: block; width: 100%; aspect-ratio: 2.35 / 1; background: #eef6f7; }
+    .log {
+      margin-top: 12px;
+      padding: 10px;
+      min-height: 88px;
+      max-height: 160px;
+      overflow: auto;
+      background: #0f172a;
+      color: #dbeafe;
+      border-radius: 7px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+    }
+    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 999px; background: #e0f2fe; color: #075985; font-size: 12px; }
+    .generated-image {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin-top: 12px;
+      display: none;
+    }
+    .image-library {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .image-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+      cursor: grab;
+    }
+    .image-card.selected { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(15,139,141,.12); }
+    .image-card img { width: 100%; display: block; aspect-ratio: 1 / 1; object-fit: cover; }
+    .image-card .caption { padding: 7px 8px; font-size: 11px; color: var(--muted); line-height: 1.35; height: 46px; overflow: hidden; }
+    .drop-ready { border-color: var(--brand) !important; box-shadow: 0 0 0 3px rgba(15,139,141,.12); }
+    .placeholder-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+    .placeholder-item { border: 1px solid var(--line); border-radius: 7px; padding: 8px; background: #f8fafc; }
+    .placeholder-item div { color: var(--muted); font-size: 12px; line-height: 1.45; margin-bottom: 6px; }
+    .asset-panel {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+    .upload-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+    .upload-row input { flex: 1; min-width: 220px; }
+    .inline-figure-flow {
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .figure-slot {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: #f8fafc;
+    }
+    .figure-slot-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+      font-weight: 800;
+      font-size: 13px;
+    }
+    .figure-slot textarea { min-height: 72px; }
+    .figure-slot .actions { margin-top: 8px; }
+    .figure-slot input[type="file"] { margin-top: 8px; }
+    .visual-editor {
+      min-height: 360px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: #fff;
+    }
+    .visual-block {
+      border: 1px solid transparent;
+      border-radius: 8px;
+      padding: 8px;
+      margin: 8px 0;
+      background: #fff;
+    }
+    .visual-block:hover,
+    .visual-block.drag-over {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3px rgba(15,139,141,.10);
+    }
+    .visual-text {
+      white-space: pre-wrap;
+      line-height: 1.85;
+      outline: none;
+    }
+    .visual-image img {
+      width: 100%;
+      max-height: 460px;
+      object-fit: contain;
+      display: block;
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+    .visual-image-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .visual-empty { color: var(--muted); padding: 20px 8px; }
+    .source-collapsed { display: none; }
+    .float-panel {
+      position: fixed;
+      right: 438px;
+      top: 92px;
+      width: min(420px, calc(100vw - 32px));
+      max-height: calc(100vh - 120px);
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+      padding: 14px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 18px 48px rgba(15, 23, 42, .18);
+      z-index: 20;
+      overflow: auto;
+    }
+    .float-panel.open { display: flex; }
+    .float-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 800; }
+    .float-head button { padding: 5px 9px; }
+    .float-panel textarea { min-height: 92px; }
+    .prompt-chips { display: flex; flex-direction: column; gap: 8px; }
+    .prompt-chip {
+      width: 100%;
+      text-align: left;
+      border: 1px solid var(--line);
+      background: #f8fafc;
+      color: var(--text);
+      font-weight: 500;
+      line-height: 1.45;
+    }
+    .mini-library {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .mini-library .image-card img { aspect-ratio: 4 / 3; }
+    .mini-library .image-card .caption { height: 38px; }
+    @media (max-width: 1160px) {
+      .float-panel { right: 16px; left: 16px; top: 74px; width: auto; }
+    }
+    @media (max-width: 1160px) {
+      main { grid-template-columns: 1fr; height: auto; }
+      section { min-height: auto; }
+      .body { height: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">公众号智能体面板</div>
+    <div class="status"><span class="dot" id="statusDot"></span><span id="statusText">检测中</span></div>
+  </header>
+
+  <main>
+    <section>
+      <div class="section-head">生成设置 <span class="pill">草稿箱优先</span></div>
+      <div class="body">
+        <label>选题</label>
+        <textarea id="topic" placeholder="例：为什么地产招采人适合用 AI 做个人主页和获客工具"></textarea>
+
+        <div class="row">
+          <div>
+            <label>目标读者</label>
+            <input id="audience" value="地产、工程、招采、造价从业者">
+          </div>
+          <div>
+            <label>语气</label>
+            <select id="tone">
+              <option>清楚、接地气、有判断</option>
+              <option>专业、克制、适合老板看</option>
+              <option>像朋友聊天，少术语</option>
+              <option>偏干货教程，步骤明确</option>
+            </select>
+          </div>
+        </div>
+
+        <label>必须写进去的要点</label>
+        <textarea id="points" placeholder="一行一个要点。比如：一级造价师背景、腾讯云服务器、公众号草稿箱、用AI做内容矩阵"></textarea>
+
+        <label>封面图提示词</label>
+        <textarea id="coverPrompt" placeholder="例：一张干净爽朗的风景图。AI封面只看这里，不参考文章内容"></textarea>
+        <div class="hint">公众号封面图只按这里生成，不读取文章标题、摘要、正文、目标读者或行业背景。</div>
+
+        <label>正文插图 / 视频提示词</label>
+        <textarea id="mediaPrompt" placeholder="例：一张清爽的公众号插图，表现一个工作流从选题到草稿箱的过程"></textarea>
+        <div class="hint">这里用于正文插图和视频，不会影响公众号封面。</div>
+
+        <label>发布口令</label>
+        <input id="token" type="password" placeholder="服务器 config.local.json 里的 publishToken">
+        <div class="hint">部署到公网时必须设置口令。AppSecret 只放服务器配置里，页面不保存公众号密钥。</div>
+
+        <div class="actions">
+          <button class="primary" id="composeBtn" onclick="compose()">AI生成文章</button>
+          <button onclick="generateAiCover()">AI生成封面图</button>
+          <button onclick="renderCover()">备用文字封面</button>
+          <button onclick="generateAiImage()">AI生成插图</button>
+          <button onclick="insertGeneratedImage()">插入正文</button>
+          <button onclick="generateVideo()">生成视频</button>
+          <button onclick="testToken()">测试微信连接</button>
+        </div>
+
+        <div class="log" id="log">等待操作...</div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">文章编辑</div>
+      <div class="body">
+        <input class="editor-title" id="title" placeholder="标题">
+        <label>摘要</label>
+        <textarea class="editor-summary" id="summary" placeholder="分享卡片摘要，建议 60-120 字"></textarea>
+        <label>正文排版</label>
+        <div id="visualEditor" class="visual-editor"></div>
+        <textarea id="markdown" class="source-collapsed" oninput="refreshPreview()" placeholder="这里编辑正文"></textarea>
+        <div id="inlineFigureSlots" class="inline-figure-flow"></div>
+        <div class="actions">
+          <button onclick="refreshPreview()">刷新预览</button>
+          <button onclick="toggleSource()">源码</button>
+          <button onclick="insertGeneratedImage()">插入选中图片</button>
+          <button onclick="useGeneratedImageAsCover()">设为封面</button>
+          <button class="publish" id="publishBtn" onclick="publishDraft()">发布到公众号草稿箱</button>
+        </div>
+
+        <div class="asset-panel">
+          <label>文章插图建议</label>
+          <div id="placeholderList" class="placeholder-list"></div>
+
+          <label>图片素材库</label>
+          <div class="upload-row">
+            <input id="uploadImageInput" type="file" accept="image/*" multiple>
+            <button onclick="handleImageUpload()">上传本地图片</button>
+            <button onclick="generateAiImage()">AI生成插图</button>
+          </div>
+          <div class="hint">素材库里的图片可以拖进正文，也可以点选后插入正文或设为封面。</div>
+          <div id="imageLibrary" class="image-library"></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">发布预览</div>
+      <div class="body">
+        <canvas id="cover" width="900" height="383" style="display:none"></canvas>
+        <label>当前封面图</label>
+        <img id="coverPreview" class="generated-image" alt="当前封面图">
+        <div class="hint">这里保持干净，只显示最终公众号草稿的大致效果。</div>
+        <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+        <div class="preview" id="preview"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="imageAssistant" class="float-panel">
+    <div class="float-head">
+      <span>插图助手</span>
+      <button onclick="closeImageAssistant()">关闭</button>
+    </div>
+    <div class="hint">先点正文里想放图的位置，再生成或选择图片，点“插入到光标位置”。也可以把下方缩略图拖进正文。</div>
+    <label>当前图片提示词</label>
+    <textarea id="assistantPrompt" placeholder="写清楚你想要的画面，例如：一张干净的夕阳日落风景照片，城市远景，无人物、无文字"></textarea>
+    <div class="actions">
+      <button class="primary" onclick="generateAssistantImage()">AI生成图片</button>
+      <button onclick="insertGeneratedImage()">插入到光标位置</button>
+      <button onclick="useGeneratedImageAsCover()">设为封面</button>
+    </div>
+    <div class="upload-row">
+      <input id="assistantUploadImageInput" type="file" accept="image/*" multiple>
+      <button onclick="handleAssistantImageUpload()">上传本地图片</button>
+    </div>
+    <label>文章建议插图</label>
+    <div id="assistantPromptList" class="prompt-chips"></div>
+    <label>已生成 / 已上传图片</label>
+    <div id="assistantImageLibrary" class="mini-library"></div>
+  </div>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    let coverDataUrl = '';
+    let currentHtml = '';
+    let generatedImageDataUrl = '';
+    let generatedImages = [];
+    let selectedImageIndex = -1;
+    let currentImagePrompts = [];
+    let visualBlocks = [];
+    let visualDragIndex = null;
+
+    function log(message) {
+      const time = new Date().toLocaleTimeString('zh-CN');
+      $('log').textContent += `\n[${time}] ${message}`;
+      $('log').scrollTop = $('log').scrollHeight;
+    }
+
+    function escapeHtml(text) {
+      return String(text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function inlineMarkdown(text) {
+      return escapeHtml(text)
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/`(.+?)`/g, '<code>$1</code>');
+    }
+
+    function markdownToHtml(markdown) {
+      const lines = String(markdown || '').split(/\r?\n/);
+      const blocks = [];
+      let paragraph = [];
+      const flush = () => {
+        if (!paragraph.length) return;
+        blocks.push(`<p>${inlineMarkdown(paragraph.join('<br>'))}</p>`);
+        paragraph = [];
+      };
+      for (const line of lines) {
+        const t = line.trim();
+        if (!t) { flush(); continue; }
+        if (/^<!--[\s\S]*-->$/.test(t)) { flush(); continue; }
+        if (t.startsWith('# ')) continue;
+        if (t.startsWith('## ')) { flush(); blocks.push(`<h2>${inlineMarkdown(t.slice(3))}</h2>`); continue; }
+        if (t.startsWith('### ')) { flush(); blocks.push(`<h3>${inlineMarkdown(t.slice(4))}</h3>`); continue; }
+        if (t.startsWith('> ')) { flush(); blocks.push(`<blockquote>${inlineMarkdown(t.slice(2))}</blockquote>`); continue; }
+        const imageMatch = t.match(/^!\[(.*?)\]\((.*?)\)$/);
+        if (imageMatch) {
+          flush();
+          blocks.push(`<p style="text-align:center"><img src="${escapeHtml(imageMatch[2])}" alt="${escapeHtml(imageMatch[1] || '文章配图')}" style="max-width:100%;border-radius:8px"></p>`);
+          continue;
+        }
+        if (/^[-*]\s+/.test(t)) { flush(); blocks.push(`<p>• ${inlineMarkdown(t.replace(/^[-*]\s+/, ''))}</p>`); continue; }
+        paragraph.push(t);
+      }
+      flush();
+      return blocks.join('\n');
+    }
+
+    function wechatHtml(markdown) {
+      return `<section style="max-width:100%;margin:0 auto;padding:4px 0 12px;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;">${markdownToHtml(markdown)
+        .replaceAll('<h2>', '<h2 style="margin:26px 0 12px;padding-left:10px;border-left:4px solid #0ea5e9;color:#0f172a;font-size:19px;">')
+        .replaceAll('<h3>', '<h3 style="margin:22px 0 10px;color:#155e75;font-size:17px;">')
+        .replaceAll('<p>', '<p style="margin:12px 0;line-height:1.9;color:#263238;font-size:15px;">')
+        .replaceAll('<blockquote>', '<blockquote style="margin:16px 0;padding:12px 14px;background:#f0f9ff;border-left:4px solid #38bdf8;color:#334155;">')}</section>`;
+    }
+
+    function parseVisualBlocks(markdown) {
+      const lines = String(markdown || '').split(/\r?\n/);
+      const blocks = [];
+      let buffer = [];
+      const flush = () => {
+        const text = buffer.join('\n').trim();
+        if (text) blocks.push({ type: 'text', text });
+        buffer = [];
+      };
+      for (const line of lines) {
+        const t = line.trim();
+        const imageMatch = t.match(/^!\[(.*?)\]\((data:image\/[a-zA-Z0-9.+-]+;base64,[^)]+|https?:\/\/[^)]+)\)$/);
+        if (imageMatch) {
+          flush();
+          blocks.push({ type: 'image', alt: imageMatch[1] || '文章配图', src: imageMatch[2] });
+          continue;
+        }
+        if (!t) {
+          flush();
+          continue;
+        }
+        if (/^<!--[\s\S]*-->$/.test(t)) {
+          flush();
+          continue;
+        }
+        buffer.push(line);
+      }
+      flush();
+      return blocks;
+    }
+
+    function visualBlockToMarkdown(block) {
+      if (block.type === 'image') return `![${block.alt || '文章配图'}](${block.src})`;
+      return block.text || '';
+    }
+
+    function syncVisualToMarkdown() {
+      $('markdown').value = visualBlocks.map(visualBlockToMarkdown).filter(Boolean).join('\n\n');
+      updatePreviewOnly();
+      renderInlineFigureSlots();
+    }
+
+    function updatePreviewOnly() {
+      const markdown = $('markdown').value;
+      currentHtml = wechatHtml(markdown);
+      $('preview').innerHTML = markdownToHtml(markdown) || '<p style="color:#607086">暂无内容</p>';
+      renderImagePlaceholders();
+    }
+
+    function renderVisualEditor() {
+      const box = $('visualEditor');
+      if (!box) return;
+      visualBlocks = parseVisualBlocks($('markdown').value);
+      if (!visualBlocks.length) {
+        box.innerHTML = '<div class="visual-empty">暂无正文</div>';
+        return;
+      }
+      box.innerHTML = visualBlocks.map((block, i) => {
+        if (block.type === 'image') {
+          return `
+            <div class="visual-block visual-image" draggable="true" data-index="${i}" ondragstart="startVisualDrag(event, ${i})" ondragover="overVisualBlock(event)" ondragleave="leaveVisualBlock(event)" ondrop="dropVisualBlock(event, ${i})">
+              <img src="${block.src}" alt="${escapeHtml(block.alt)}">
+              <div class="visual-image-bar">
+                <span>拖动图片调整位置</span>
+                <button onclick="removeVisualBlock(${i})">删除</button>
+              </div>
+            </div>
+          `;
+        }
+        return `
+          <div class="visual-block visual-text" draggable="true" contenteditable="true" data-index="${i}" oninput="updateVisualText(${i}, this.innerText)" ondragstart="startVisualDrag(event, ${i})" ondragover="overVisualBlock(event)" ondragleave="leaveVisualBlock(event)" ondrop="dropVisualBlock(event, ${i})">${escapeHtml(block.text)}</div>
+        `;
+      }).join('');
+    }
+
+    function updateVisualText(index, text) {
+      if (!visualBlocks[index]) return;
+      visualBlocks[index].text = text.trim();
+      syncVisualToMarkdown();
+    }
+
+    function startVisualDrag(event, index) {
+      visualDragIndex = index;
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('application/x-visual-index', String(index));
+    }
+
+    function overVisualBlock(event) {
+      event.preventDefault();
+      event.currentTarget.classList.add('drag-over');
+    }
+
+    function leaveVisualBlock(event) {
+      event.currentTarget.classList.remove('drag-over');
+    }
+
+    function dropVisualBlock(event, targetIndex) {
+      event.preventDefault();
+      event.currentTarget.classList.remove('drag-over');
+      const imageMarkdownText = event.dataTransfer.getData('text/plain');
+      const imageMatch = imageMarkdownText.match(/^!\[(.*?)\]\((data:image\/[a-zA-Z0-9.+-]+;base64,[^)]+|https?:\/\/[^)]+)\)$/m);
+      if (imageMatch && event.dataTransfer.getData('application/x-wechat-image-index')) {
+        visualBlocks.splice(targetIndex, 0, { type: 'image', alt: imageMatch[1] || '文章配图', src: imageMatch[2] });
+        syncVisualToMarkdown();
+        renderVisualEditor();
+        return;
+      }
+      const from = Number(event.dataTransfer.getData('application/x-visual-index'));
+      if (!Number.isInteger(from) || from === targetIndex || !visualBlocks[from]) return;
+      const [moved] = visualBlocks.splice(from, 1);
+      const nextIndex = from < targetIndex ? targetIndex - 1 : targetIndex;
+      visualBlocks.splice(nextIndex, 0, moved);
+      syncVisualToMarkdown();
+      renderVisualEditor();
+    }
+
+    function removeVisualBlock(index) {
+      visualBlocks.splice(index, 1);
+      syncVisualToMarkdown();
+      renderVisualEditor();
+    }
+
+    function addImageBlockToVisual(item) {
+      visualBlocks = parseVisualBlocks($('markdown').value);
+      visualBlocks.push({ type: 'image', alt: item.prompt || '文章配图', src: item.dataUrl });
+      syncVisualToMarkdown();
+      renderVisualEditor();
+    }
+
+    function toggleSource() {
+      $('markdown').classList.toggle('source-collapsed');
+    }
+
+    async function api(path, body = {}, timeout = 30000) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeout);
+      try {
+        const headers = { 'Content-Type': 'application/json' };
+        const token = $('token').value.trim();
+        if (token) headers['X-Publish-Token'] = token;
+        const res = await fetch(path, { method: 'POST', headers, body: JSON.stringify(body), signal: controller.signal });
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+        return data;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    function ensureImagePlaceholders(markdown, prompts) {
+      const cleanPrompts = (prompts || []).map(item => String(item || '').trim()).filter(Boolean);
+      if (!cleanPrompts.length || /<!--\s*image:\s*[\s\S]*?-->/g.test(markdown)) return markdown;
+      const lines = String(markdown || '').split(/\r?\n/);
+      let used = 0;
+      const output = [];
+      for (const line of lines) {
+        output.push(line);
+        if (used < cleanPrompts.length && /^#{2,3}\s+/.test(line.trim())) {
+          output.push('');
+          output.push(`<!-- image: ${cleanPrompts[used]} -->`);
+          output.push('');
+          used += 1;
+        }
+      }
+      while (used < cleanPrompts.length) {
+        output.push('');
+        output.push(`<!-- image: ${cleanPrompts[used]} -->`);
+        used += 1;
+      }
+      return output.join('\n');
+    }
+
+    async function checkStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        $('statusDot').classList.toggle('ok', data.ok && data.configured);
+        $('statusText').textContent = data.configured ? `已配置：${data.account || '公众号'}` : '后端未配置公众号';
+      } catch {
+        $('statusDot').classList.remove('ok');
+        $('statusText').textContent = '后端未连接';
+      }
+    }
+
+    async function compose() {
+      const btn = $('composeBtn');
+      btn.disabled = true;
+      btn.textContent = '生成中...';
+      log('开始生成文章初稿，Agnes 可能需要 1-2 分钟...');
+      try {
+        const data = await api('/api/compose', {
+          topic: $('topic').value,
+          audience: $('audience').value,
+          tone: $('tone').value,
+          points: $('points').value
+        }, 150000);
+        $('title').value = data.title;
+        $('summary').value = data.summary;
+        $('markdown').value = ensureImagePlaceholders(data.markdown, data.imagePrompts || []);
+        if (data.imagePrompts && data.imagePrompts.length) {
+          $('mediaPrompt').value = data.imagePrompts[0];
+        }
+        refreshPreview();
+        renderImagePlaceholders(data.imagePrompts || []);
+        if (data.warning) log(`AI生成失败，已用本地模板兜底：${data.warning}`);
+        else log(`AI初稿已生成，模型：${data.model || '默认模型'}`);
+        log('文章插图卡已生成，可在正文下方逐个生成或上传图片。');
+      } catch (err) {
+        const message = err.name === 'AbortError'
+          ? '文章生成超时。Agnes 这次响应太慢，可以再点一次，或先用已有内容编辑。'
+          : `文章生成失败：${err.message}`;
+        log(message);
+        alert(message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'AI生成文章';
+      }
+    }
+
+    function refreshPreview() {
+      const markdown = $('markdown').value;
+      currentHtml = wechatHtml(markdown);
+      $('preview').innerHTML = markdownToHtml(markdown) || '<p style="color:#607086">暂无内容</p>';
+      renderImagePlaceholders();
+      renderInlineFigureSlots();
+      renderVisualEditor();
+    }
+
+    function extractImagePlaceholders() {
+      const matches = [...$('markdown').value.matchAll(/<!--\s*image:\s*([\s\S]*?)\s*-->/g)];
+      return matches.map(m => m[1].trim()).filter(Boolean);
+    }
+
+    function extractImageSlots() {
+      return [...$('markdown').value.matchAll(/<!--\s*image:\s*([\s\S]*?)\s*-->/g)]
+        .map((match, index) => ({
+          index,
+          full: match[0],
+          prompt: match[1].trim()
+        }))
+        .filter(item => item.prompt);
+    }
+
+    function renderInlineFigureSlots() {
+      const box = $('inlineFigureSlots');
+      if (!box) return;
+      const slots = extractImageSlots();
+      if (!slots.length) {
+        box.innerHTML = '';
+        return;
+      }
+      box.innerHTML = slots.map(slot => `
+        <div class="figure-slot">
+          <div class="figure-slot-head">
+            <span>配图 ${slot.index + 1}</span>
+            <span>${escapeHtml(slot.prompt.slice(0, 20))}</span>
+          </div>
+          <textarea id="slotPrompt-${slot.index}">${escapeHtml(slot.prompt)}</textarea>
+          <div class="actions">
+            <button class="primary" onclick="generateImageForSlot(${slot.index})">AI生成</button>
+            <button onclick="insertSelectedImageForSlot(${slot.index})">插入选中图</button>
+          </div>
+          <input id="slotUpload-${slot.index}" type="file" accept="image/*" onchange="uploadImageForSlot(${slot.index})">
+        </div>
+      `).join('');
+    }
+
+    function replaceImageSlot(index, item) {
+      const box = $('markdown');
+      let current = -1;
+      box.value = box.value.replace(/<!--\s*image:\s*([\s\S]*?)\s*-->/g, full => {
+        current += 1;
+        return current === index ? imageMarkdown(item).trim() : full;
+      });
+      refreshPreview();
+      renderVisualEditor();
+    }
+
+    function renderImagePlaceholders(prompts) {
+      const list = prompts && prompts.length ? prompts : extractImagePlaceholders();
+      currentImagePrompts = list.slice(0, 6);
+      renderAssistantPromptList();
+      const box = $('placeholderList');
+      if (!box) return;
+      if (!list.length) {
+        box.innerHTML = '<div class="hint">文章里暂无插图提示。AI生成文章后会自动出现，也可以自己填写图片提示词。</div>';
+        return;
+      }
+      box.innerHTML = list.slice(0, 6).map((prompt, i) => `
+        <div class="placeholder-item">
+          <div>${escapeHtml(prompt)}</div>
+          <button onclick="generateAiImageFromPrompt(${i})">生成这张图</button>
+        </div>
+      `).join('');
+      box.dataset.prompts = JSON.stringify(list.slice(0, 6));
+    }
+
+    function openImageAssistant(prompt = '') {
+      const panel = $('imageAssistant');
+      if (!panel) return;
+      if (prompt) $('assistantPrompt').value = prompt;
+      else if (!$('assistantPrompt').value.trim()) $('assistantPrompt').value = $('mediaPrompt').value.trim();
+      panel.classList.add('open');
+      renderAssistantPromptList();
+      renderAssistantImageLibrary();
+    }
+
+    function closeImageAssistant() {
+      $('imageAssistant')?.classList.remove('open');
+    }
+
+    function useAssistantPrompt(index) {
+      const prompt = currentImagePrompts[index];
+      if (!prompt) return;
+      $('assistantPrompt').value = prompt;
+      $('mediaPrompt').value = prompt;
+      openImageAssistant(prompt);
+    }
+
+    function renderAssistantPromptList() {
+      const box = $('assistantPromptList');
+      if (!box) return;
+      if (!currentImagePrompts.length) {
+        box.innerHTML = '<div class="hint">暂无建议。AI生成文章后会出现，也可以直接在上方写图片提示词。</div>';
+        return;
+      }
+      box.innerHTML = currentImagePrompts.map((prompt, i) => `
+        <button class="prompt-chip" onclick="useAssistantPrompt(${i})">${escapeHtml(prompt)}</button>
+      `).join('');
+    }
+
+    function renderAssistantImageLibrary() {
+      const box = $('assistantImageLibrary');
+      if (!box) return;
+      if (!generatedImages.length) {
+        box.innerHTML = '<div class="hint">还没有图片。可以 AI 生成，也可以在中间素材库上传本地图片。</div>';
+        return;
+      }
+      box.innerHTML = generatedImages.map((item, i) => `
+        <div class="image-card ${i === selectedImageIndex ? 'selected' : ''}" draggable="true" onclick="selectImage(${i})" ondragstart="dragImage(event, ${i})">
+          <img src="${item.dataUrl}" alt="${escapeHtml(item.prompt)}">
+          <div class="caption">${escapeHtml(item.prompt)}</div>
+        </div>
+      `).join('');
+    }
+
+    function addGeneratedImage(dataUrl, prompt) {
+      generatedImages.push({ dataUrl, prompt: prompt || 'AI生成插图' });
+      selectedImageIndex = generatedImages.length - 1;
+      generatedImageDataUrl = dataUrl;
+      renderImageLibrary();
+      renderAssistantImageLibrary();
+    }
+
+    function renderImageLibrary() {
+      const box = $('imageLibrary');
+      if (!box) return;
+      if (!generatedImages.length) {
+        box.innerHTML = '<div class="hint">还没有生成图片。点击“AI生成插图”或用上方插图提示生成。</div>';
+        return;
+      }
+      box.innerHTML = generatedImages.map((item, i) => `
+        <div class="image-card ${i === selectedImageIndex ? 'selected' : ''}" draggable="true" onclick="selectImage(${i})" ondragstart="dragImage(event, ${i})">
+          <img src="${item.dataUrl}" alt="${escapeHtml(item.prompt)}">
+          <div class="caption">${escapeHtml(item.prompt)}</div>
+        </div>
+      `).join('');
+    }
+
+    function selectImage(index) {
+      selectedImageIndex = index;
+      generatedImageDataUrl = generatedImages[index]?.dataUrl || '';
+      renderImageLibrary();
+      renderAssistantImageLibrary();
+    }
+
+    function dragImage(event, index) {
+      const item = generatedImages[index];
+      if (!item) return;
+      event.dataTransfer.setData('text/plain', imageMarkdown(item));
+      event.dataTransfer.setData('application/x-wechat-image-index', String(index));
+      event.dataTransfer.effectAllowed = 'copy';
+    }
+
+    function imageMarkdown(item) {
+      return `\n\n![${item.prompt || '文章配图'}](${item.dataUrl})\n\n`;
+    }
+
+    function insertTextAtCursor(box, text) {
+      const start = box.selectionStart ?? box.value.length;
+      const end = box.selectionEnd ?? box.value.length;
+      box.value = box.value.slice(0, start) + text + box.value.slice(end);
+      const next = start + text.length;
+      box.focus();
+      box.setSelectionRange(next, next);
+      refreshPreview();
+    }
+
+    function setupMarkdownDrop() {
+      const box = $('markdown');
+      box.addEventListener('dragover', event => {
+        event.preventDefault();
+        box.classList.add('drop-ready');
+      });
+      box.addEventListener('dragleave', () => box.classList.remove('drop-ready'));
+      box.addEventListener('drop', event => {
+        event.preventDefault();
+        box.classList.remove('drop-ready');
+        const markdown = event.dataTransfer.getData('text/plain');
+        if (!markdown) return;
+        insertTextAtCursor(box, markdown);
+        log('已通过拖拽插入图片到正文。');
+      });
+    }
+
+    function setupVisualEditorDrop() {
+      const box = $('visualEditor');
+      if (!box) return;
+      box.addEventListener('dragover', event => {
+        event.preventDefault();
+        box.classList.add('drop-ready');
+      });
+      box.addEventListener('dragleave', () => box.classList.remove('drop-ready'));
+      box.addEventListener('drop', event => {
+        event.preventDefault();
+        box.classList.remove('drop-ready');
+        if (event.target.closest('.visual-block')) return;
+        const markdown = event.dataTransfer.getData('text/plain');
+        const imageMatch = markdown.match(/^!\[(.*?)\]\((data:image\/[a-zA-Z0-9.+-]+;base64,[^)]+|https?:\/\/[^)]+)\)$/m);
+        if (!imageMatch) return;
+        visualBlocks = parseVisualBlocks($('markdown').value);
+        visualBlocks.push({ type: 'image', alt: imageMatch[1] || '文章配图', src: imageMatch[2] });
+        syncVisualToMarkdown();
+        renderVisualEditor();
+      });
+    }
+
+    function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
+      const chars = Array.from(text);
+      let line = '';
+      let lines = 0;
+      for (const ch of chars) {
+        const test = line + ch;
+        if (ctx.measureText(test).width > maxWidth && line) {
+          ctx.fillText(line, x, y);
+          y += lineHeight;
+          lines += 1;
+          line = ch;
+          if (lines >= maxLines - 1) break;
+        } else {
+          line = test;
+        }
+      }
+      if (line && lines < maxLines) ctx.fillText(line, x, y);
+    }
+
+    function renderCover() {
+      const canvas = $('cover');
+      const ctx = canvas.getContext('2d');
+      const title = $('title').value || $('topic').value || '公众号文章';
+      const summary = $('summary').value || '喵喵小仙儿';
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      gradient.addColorStop(0, '#e0f2fe');
+      gradient.addColorStop(1, '#f8fafc');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#0f8b8d';
+      ctx.fillRect(0, 0, 18, canvas.height);
+      ctx.fillStyle = '#0f172a';
+      ctx.font = '700 52px Microsoft YaHei, sans-serif';
+      wrapText(ctx, title, 70, 125, 720, 64, 2);
+      ctx.fillStyle = '#475569';
+      ctx.font = '28px Microsoft YaHei, sans-serif';
+      wrapText(ctx, summary, 72, 270, 740, 38, 2);
+      ctx.fillStyle = '#146c94';
+      ctx.font = '700 24px Microsoft YaHei, sans-serif';
+      ctx.fillText('喵喵小仙儿', 70, 342);
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '20px Microsoft YaHei, sans-serif';
+      ctx.fillText('AI × 地产招采 × 个人IP', 218, 342);
+      coverDataUrl = canvas.toDataURL('image/png');
+      const preview = $('coverPreview');
+      preview.src = coverDataUrl;
+      preview.style.display = 'block';
+      log('封面已生成。');
+    }
+
+    async function requestAiImage(prompt) {
+      return await api('/api/ai/image', { prompt }, 120000);
+    }
+
+    async function generateAiImage(promptOverride = '') {
+      const prompt = String(promptOverride || $('mediaPrompt').value).trim();
+      if (!prompt) {
+        alert('请先填写正文插图 / 视频提示词，或点击文章插图建议里的“生成这张图”。');
+        return;
+      }
+      $('mediaPrompt').value = prompt;
+      if ($('assistantPrompt')) $('assistantPrompt').value = prompt;
+      try {
+        log('开始生成 AI 图片...');
+        const data = await requestAiImage(prompt);
+        generatedImageDataUrl = data.dataUrl;
+        addGeneratedImage(generatedImageDataUrl, prompt);
+        log(`AI 图片已生成，模型：${data.model || '默认模型'}`);
+        return { dataUrl: generatedImageDataUrl, prompt };
+      } catch (err) {
+        const message = `AI 图片生成失败：${err.message}`;
+        log(message);
+        alert(message);
+        return null;
+      }
+    }
+
+    async function generateImageForSlot(index) {
+      const prompt = $(`slotPrompt-${index}`)?.value.trim();
+      if (!prompt) return alert('请先填写图片提示词');
+      const item = await generateAiImage(prompt);
+      if (!item) return;
+      replaceImageSlot(index, item);
+      log(`配图 ${index + 1} 已插入正文。`);
+    }
+
+    function insertSelectedImageForSlot(index) {
+      const item = generatedImages[selectedImageIndex];
+      if (!item) return alert('请先在素材库选中一张图片');
+      replaceImageSlot(index, item);
+      log(`选中图片已插入配图 ${index + 1}。`);
+    }
+
+    function uploadImageForSlot(index) {
+      const input = $(`slotUpload-${index}`);
+      const file = input?.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const item = { dataUrl: reader.result, prompt: `本地上传：${file.name}` };
+        addGeneratedImage(item.dataUrl, item.prompt);
+        replaceImageSlot(index, item);
+        log(`本地图片已插入配图 ${index + 1}：${file.name}`);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    async function generateAssistantImage() {
+      const prompt = $('assistantPrompt').value.trim();
+      if (!prompt) return alert('请先填写图片提示词');
+      await generateAiImage(prompt);
+      openImageAssistant(prompt);
+    }
+
+    function handleImageUpload() {
+      const input = $('uploadImageInput');
+      const files = [...(input.files || [])];
+      if (!files.length) return alert('请先选择图片');
+      addFilesToLibrary(files);
+      input.value = '';
+    }
+
+    function handleAssistantImageUpload() {
+      const input = $('assistantUploadImageInput');
+      const files = [...(input.files || [])];
+      if (!files.length) return alert('请先选择图片');
+      addFilesToLibrary(files);
+      input.value = '';
+      openImageAssistant();
+    }
+
+    function addFilesToLibrary(files) {
+      files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          addGeneratedImage(reader.result, `本地上传：${file.name}`);
+          log(`已上传图片：${file.name}`);
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function buildCoverPrompt(userPrompt) {
+      const text = userPrompt.trim();
+      const wantsLandscape = /风景|景色|山|海|湖|森林|草地|天空|日出|日落|自然|田野|河流|溪流|云|远山/.test(text);
+      const asksPeople = /人|人物|女孩|男孩|女人|男人|儿童|小孩|孩子|宝宝|舞蹈|跳舞|肖像|自拍|团队|工人|老板|员工/.test(text);
+      if (wantsLandscape) {
+        return [
+          `Pure landscape photo: ${text}`,
+          'Horizontal WeChat article cover, bright, clean, fresh, airy, natural light, realistic photography.',
+          asksPeople ? 'Use only the subject explicitly requested by the user.' : 'Landscape only. No people. No human. No portrait. No woman. No man. No office. No laptop. No computer. No screen. No desk. No chart.',
+          'No text, no title, no caption, no watermark, no logo, no UI elements.'
+        ].join('\n');
+      }
+      if (text) {
+        return [
+          text,
+          'Generate exactly according to the user prompt above. Do not use article title, summary, body, industry background, or previous images as context.',
+          'Horizontal WeChat article cover, realistic photography, clean and bright.',
+          'No text, no title, no watermark, no logo.',
+          'Do not add people, office, laptop, computer, or screen unless explicitly requested in the user prompt.'
+        ].join('\n');
+      }
+      return [
+        'A clean bright natural landscape photograph for a WeChat article cover.',
+        'Horizontal composition, fresh air, soft sunlight, open sky, calm scenery, realistic photography.',
+        'No people, no office, no computer, no screen, no text, no watermark, no logo.'
+      ].join('\n');
+    }
+
+    function buildCoverNegativePrompt(userPrompt) {
+      const text = userPrompt.trim();
+      const asksPeople = /人|人物|女孩|男孩|女人|男人|儿童|小孩|孩子|宝宝|舞蹈|跳舞|肖像|自拍|团队|工人|老板|员工/.test(text);
+      const wantsLandscape = /风景|景色|山|海|湖|森林|草地|天空|日出|日落|自然|田野|河流|溪流|云|远山/.test(text);
+      const basic = ['text', 'words', 'caption', 'logo', 'watermark', 'low quality', 'distorted'];
+      if (wantsLandscape && !asksPeople) {
+        basic.push('people', 'person', 'human', 'woman', 'man', 'face', 'portrait', 'office', 'laptop', 'computer', 'screen', 'desk', 'chart');
+      }
+      return basic.join(', ');
+    }
+
+    async function generateAiCover() {
+      const userPrompt = $('coverPrompt').value.trim();
+      const prompt = buildCoverPrompt(userPrompt);
+      try {
+        log('开始生成公众号 AI 封面图...');
+        log(`封面提示词：${userPrompt || '默认风景图'}`);
+        const data = await api('/api/ai/image', {
+          prompt,
+          size: '1024x768',
+          negative_prompt: buildCoverNegativePrompt(userPrompt)
+        }, 120000);
+        generatedImageDataUrl = data.dataUrl;
+        addGeneratedImage(generatedImageDataUrl, `封面图：${userPrompt || '默认风景图'}`);
+        applyImageAsCover(generatedImageDataUrl);
+        log(`AI 封面图已生成并设为当前封面，模型：${data.model || '默认模型'}`);
+      } catch (err) {
+        const message = `AI 封面图生成失败：${err.message}`;
+        log(message);
+        alert(message);
+      }
+    }
+
+    async function generateAiImageFromPrompt(index) {
+      const prompts = JSON.parse($('placeholderList').dataset.prompts || '[]');
+      const prompt = prompts[index];
+      if (!prompt) return;
+      $('mediaPrompt').value = prompt;
+      $('assistantPrompt').value = prompt;
+      await generateAiImage();
+    }
+
+    function insertGeneratedImage() {
+      const item = generatedImages[selectedImageIndex] || (generatedImageDataUrl ? { dataUrl: generatedImageDataUrl, prompt: $('mediaPrompt').value.trim() || 'AI生成插图' } : null);
+      if (!item) return alert('请先生成或选中一张 AI 图片');
+      addImageBlockToVisual(item);
+      log('图片已插入正文，可在中间排版区拖动调整位置。');
+    }
+
+    function useGeneratedImageAsCover() {
+      if (!generatedImageDataUrl) return alert('请先生成 AI 图片');
+      applyImageAsCover(generatedImageDataUrl);
+    }
+
+    function applyImageAsCover(dataUrl) {
+      coverDataUrl = dataUrl;
+      const canvas = $('cover');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      img.onload = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const scale = Math.max(canvas.width / img.width, canvas.height / img.height);
+        const w = img.width * scale;
+        const h = img.height * scale;
+        ctx.drawImage(img, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+        coverDataUrl = canvas.toDataURL('image/png');
+        const preview = $('coverPreview');
+        preview.src = coverDataUrl;
+        preview.style.display = 'block';
+        log('已将 AI 图片设为封面。');
+      };
+      img.src = dataUrl;
+    }
+
+    async function generateVideo() {
+      const prompt = $('mediaPrompt').value.trim();
+      if (!prompt) {
+        alert('请先填写正文插图 / 视频提示词。');
+        return;
+      }
+      log('开始请求 AI 视频生成...');
+      const data = await api('/api/ai/video', { prompt }, 120000);
+      if (data.ok === false) {
+        log(data.message);
+        alert(data.message);
+        return;
+      }
+      log(`视频任务已提交：${JSON.stringify(data.data).slice(0, 300)}`);
+    }
+
+    async function testToken() {
+      log('测试微信接口连接...');
+      const data = await api('/api/wechat/test-token', {}, 20000);
+      log(`微信连接正常：${data.tokenPreview}`);
+    }
+
+    async function publishDraft() {
+      if (!$('title').value.trim()) return alert('请先填写标题');
+      if (!$('markdown').value.trim()) return alert('请先生成或填写正文');
+      if (!coverDataUrl) renderCover();
+      $('publishBtn').disabled = true;
+      try {
+        log('开始发布到公众号草稿箱...');
+        refreshPreview();
+        const data = await api('/api/wechat/draft', {
+          title: $('title').value,
+          summary: $('summary').value,
+          markdown: $('markdown').value,
+          html: currentHtml,
+          coverDataUrl
+        }, 60000);
+        log(`发布成功：${data.message}`);
+        log(`media_id: ${data.mediaId}`);
+      } catch (err) {
+        log(`发布失败：${err.message}`);
+        alert(err.message);
+      } finally {
+        $('publishBtn').disabled = false;
+      }
+    }
+
+    $('log').textContent = '面板已加载。';
+    checkStatus();
+    refreshPreview();
+    renderImageLibrary();
+    renderAssistantPromptList();
+    renderAssistantImageLibrary();
+    setupMarkdownDrop();
+    setupVisualEditorDrop();
+  </script>
+</body>
+</html>

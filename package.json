@@ -1,0 +1,14 @@
+{
+  "name": "wechat-agent-panel",
+  "version": "0.1.0",
+  "private": true,
+  "description": "微信公众号文章智能体面板：生成文章、封面、排版并发布到草稿箱",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
+

@@ -1,0 +1,22 @@
+{
+  "server": {
+    "port": 3100
+  },
+  "security": {
+    "publishToken": "change-this-token"
+  },
+  "wechat": {
+    "name": "喵喵小仙儿",
+    "appId": "wx...",
+    "appSecret": "your_app_secret",
+    "author": "小仙儿"
+  },
+  "ai": {
+    "baseUrl": "https://apihub.agnes-ai.com/v1",
+    "apiKey": "sk-...",
+    "textModel": "agnes-2.0-flash",
+    "imageModel": "agnes-image-2.1-flash",
+    "videoModel": "agnes-video-v2.0",
+    "videoEndpoint": ""
+  }
+}
