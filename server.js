@@ -94,6 +94,9 @@ function escapeHtml(text) {
 function inlineMarkdown(text) {
   return escapeHtml(text)
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\+\+(.+?)\+\+/g, '<span style="color:#0f8b8d;font-weight:700">$1</span>')
+    .replace(/\{color:([^}]+)\}([\s\S]+?)\{\/color\}/g, '<span style="color:$1">$2</span>')
+    .replace(/\{size:(\d+)\}([\s\S]+?)\{\/size\}/g, '<span style="font-size:$1px">$2</span>')
     .replace(/`(.+?)`/g, '<code>$1</code>');
 }
 
@@ -103,7 +106,7 @@ function markdownToWechatHtml(markdown) {
   let paragraph = [];
   const flushParagraph = () => {
     if (!paragraph.length) return;
-    blocks.push(`<p style="margin: 12px 0; line-height: 1.9; color: #263238; font-size: 15px;">${inlineMarkdown(paragraph.join('<br>'))}</p>`);
+    blocks.push(`<p style="margin: 12px 0; line-height: 1.9; color: #263238; font-size: 15px;">${paragraph.map(inlineMarkdown).join('<br>')}</p>`);
     paragraph = [];
   };
 

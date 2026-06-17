@@ -95,6 +95,8 @@
     button.publish { background: var(--brand2); border-color: var(--brand2); color: #fff; }
     button:disabled { opacity: .55; cursor: not-allowed; }
     .hint { color: var(--muted); font-size: 12px; line-height: 1.6; margin-top: 8px; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; align-items: center; }
+    .toolbar select, .toolbar input { width: auto; min-width: 92px; padding: 7px 8px; }
     .editor-title { font-size: 24px; font-weight: 800; padding: 10px 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; }
     .editor-summary { min-height: 66px; }
     #markdown { min-height: 430px; font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; }
@@ -236,6 +238,7 @@
     }
     .visual-empty { color: var(--muted); padding: 20px 8px; }
     .source-collapsed { display: none; }
+    .paste-box { min-height: 100px; }
     .float-panel {
       position: fixed;
       right: 438px;
@@ -322,7 +325,10 @@
 
         <label>正文插图 / 视频提示词</label>
         <textarea id="mediaPrompt" placeholder="例：一张清爽的公众号插图，表现一个工作流从选题到草稿箱的过程"></textarea>
-        <div class="hint">这里用于正文插图和视频，不会影响公众号封面。</div>
+        <div class="hint">这里用于正文插图，不会影响公众号封面。</div>
+
+        <label>视频提示词</label>
+        <textarea id="videoPrompt" placeholder="例：一个简洁的工具演示短视频，展示从选题到保存草稿箱的过程"></textarea>
 
         <label>发布口令</label>
         <input id="token" type="password" placeholder="服务器 config.local.json 里的 publishToken">
@@ -351,12 +357,28 @@
         <label>摘要</label>
         <textarea class="editor-summary" id="summary" placeholder="分享卡片摘要，建议 60-120 字"></textarea>
         <label>正文排版</label>
+        <div class="toolbar">
+          <button onclick="formatSelection('h2')">标题</button>
+          <button onclick="formatSelection('bold')">加粗</button>
+          <button onclick="formatSelection('quote')">引用</button>
+          <select id="fontSize">
+            <option value="15">15px</option>
+            <option value="16">16px</option>
+            <option value="18">18px</option>
+            <option value="20">20px</option>
+          </select>
+          <input id="fontColor" type="color" value="#0f172a">
+          <button onclick="formatSelection('style')">应用样式</button>
+        </div>
         <div id="visualEditor" class="visual-editor"></div>
         <textarea id="markdown" class="source-collapsed" oninput="refreshPreview()" placeholder="这里编辑正文"></textarea>
+        <textarea id="pasteInput" class="paste-box source-collapsed" placeholder="把已有文章粘贴到这里"></textarea>
         <div id="inlineFigureSlots" class="inline-figure-flow"></div>
         <div class="actions">
           <button onclick="refreshPreview()">刷新预览</button>
           <button onclick="toggleSource()">源码</button>
+          <button onclick="togglePasteBox()">粘贴文章</button>
+          <button onclick="importPastedArticle()">导入粘贴内容</button>
           <button onclick="insertGeneratedImage()">插入选中图片</button>
           <button onclick="useGeneratedImageAsCover()">设为封面</button>
           <button class="publish" id="publishBtn" onclick="publishDraft()">发布到公众号草稿箱</button>
@@ -443,6 +465,9 @@
     function inlineMarkdown(text) {
       return escapeHtml(text)
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\+\+(.+?)\+\+/g, '<span style="color:#0f8b8d;font-weight:700">$1</span>')
+        .replace(/\{color:([^}]+)\}([\s\S]+?)\{\/color\}/g, '<span style="color:$1">$2</span>')
+        .replace(/\{size:(\d+)\}([\s\S]+?)\{\/size\}/g, '<span style="font-size:$1px">$2</span>')
         .replace(/`(.+?)`/g, '<code>$1</code>');
     }
 
@@ -452,7 +477,7 @@
       let paragraph = [];
       const flush = () => {
         if (!paragraph.length) return;
-        blocks.push(`<p>${inlineMarkdown(paragraph.join('<br>'))}</p>`);
+        blocks.push(`<p>${paragraph.map(inlineMarkdown).join('<br>')}</p>`);
         paragraph = [];
       };
       for (const line of lines) {
@@ -615,6 +640,56 @@
 
     function toggleSource() {
       $('markdown').classList.toggle('source-collapsed');
+    }
+
+    function togglePasteBox() {
+      $('pasteInput').classList.toggle('source-collapsed');
+      if (!$('pasteInput').classList.contains('source-collapsed')) $('pasteInput').focus();
+    }
+
+    function importPastedArticle() {
+      const text = $('pasteInput').value.trim();
+      if (!text) return alert('请先粘贴文章内容');
+      $('markdown').value = text;
+      $('pasteInput').classList.add('source-collapsed');
+      refreshPreview();
+      log('已导入粘贴文章。');
+    }
+
+    function selectedVisualTextBlock() {
+      const selection = window.getSelection();
+      if (!selection || !selection.rangeCount) return null;
+      const node = selection.anchorNode;
+      const el = node?.nodeType === 1 ? node : node?.parentElement;
+      return el?.closest?.('.visual-text') || null;
+    }
+
+    function applyMarkdownWrapper(index, wrapper) {
+      const block = visualBlocks[index];
+      if (!block || block.type !== 'text') return;
+      const selection = window.getSelection();
+      const selected = String(selection || '').trim();
+      if (selected && block.text.includes(selected)) {
+        block.text = block.text.replace(selected, wrapper(selected));
+      } else {
+        block.text = wrapper(block.text);
+      }
+      syncVisualToMarkdown();
+      renderVisualEditor();
+    }
+
+    function formatSelection(type) {
+      const blockEl = selectedVisualTextBlock();
+      if (!blockEl) return alert('请先点击或选中文章里的文字');
+      const index = Number(blockEl.dataset.index);
+      if (type === 'h2') return applyMarkdownWrapper(index, text => `## ${text.replace(/^#+\s*/, '')}`);
+      if (type === 'bold') return applyMarkdownWrapper(index, text => `**${text}**`);
+      if (type === 'quote') return applyMarkdownWrapper(index, text => text.split(/\n/).map(line => `> ${line}`).join('\n'));
+      if (type === 'style') {
+        const color = $('fontColor').value || '#0f172a';
+        const size = $('fontSize').value || '15';
+        return applyMarkdownWrapper(index, text => `{size:${size}}{color:${color}}${text}{/color}{/size}`);
+      }
     }
 
     function buildApiUrl(path, baseUrl = '') {
@@ -982,6 +1057,36 @@
       log('封面已生成。');
     }
 
+    function extractCoverTextPrompt(userPrompt) {
+      const text = userPrompt.trim();
+      const match = text.match(/(?:白色字|黑色字|文字|字|标题)\s*[：:]\s*([\s\S]+)/);
+      if (match) return match[1].trim().replace(/^["“]|["”]$/g, '');
+      if (/黑底|纯黑|白字|白色字|文字封面/.test(text)) return text.replace(/纯黑底|黑底|白色字|白字|文字|封面|[：:]/g, ' ').trim();
+      return '';
+    }
+
+    function renderPromptTextCover(userPrompt) {
+      const canvas = $('cover');
+      const ctx = canvas.getContext('2d');
+      const coverText = extractCoverTextPrompt(userPrompt) || $('title').value || '公众号文章';
+      const dark = /黑底|纯黑|黑色/.test(userPrompt);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = dark ? '#050505' : '#f8fafc';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = dark ? '#ffffff' : '#0f172a';
+      ctx.font = '800 58px Microsoft YaHei, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      wrapText(ctx, coverText, canvas.width / 2, 150, 760, 72, 3);
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+      coverDataUrl = canvas.toDataURL('image/png');
+      const preview = $('coverPreview');
+      preview.src = coverDataUrl;
+      preview.style.display = 'block';
+      log('文字封面已生成。');
+    }
+
     async function requestAiImage(prompt) {
       return await api('/api/ai/image', { prompt }, 120000);
     }
@@ -1080,26 +1185,16 @@
       const asksPeople = /人|人物|女孩|男孩|女人|男人|儿童|小孩|孩子|宝宝|舞蹈|跳舞|肖像|自拍|团队|工人|老板|员工/.test(text);
       if (wantsLandscape) {
         return [
-          `Pure landscape photo: ${text}`,
-          'Horizontal WeChat article cover, bright, clean, fresh, airy, natural light, realistic photography.',
-          asksPeople ? 'Use only the subject explicitly requested by the user.' : 'Landscape only. No people. No human. No portrait. No woman. No man. No office. No laptop. No computer. No screen. No desk. No chart.',
-          'No text, no title, no caption, no watermark, no logo, no UI elements.'
+          text,
+          '公众号横版封面图，真实摄影感，画面干净明亮，自然光。',
+          asksPeople ? '只生成用户明确要求的主体。' : '只要自然风景，不要人物，不要办公室，不要电脑，不要屏幕，不要图表。',
+          '不要文字，不要标题，不要水印，不要 logo。'
         ].join('\n');
       }
       if (text) {
-        return [
-          text,
-          'Generate exactly according to the user prompt above. Do not use article title, summary, body, industry background, or previous images as context.',
-          'Horizontal WeChat article cover, realistic photography, clean and bright.',
-          'No text, no title, no watermark, no logo.',
-          'Do not add people, office, laptop, computer, or screen unless explicitly requested in the user prompt.'
-        ].join('\n');
+        return text;
       }
-      return [
-        'A clean bright natural landscape photograph for a WeChat article cover.',
-        'Horizontal composition, fresh air, soft sunlight, open sky, calm scenery, realistic photography.',
-        'No people, no office, no computer, no screen, no text, no watermark, no logo.'
-      ].join('\n');
+      return '一张干净明亮的公众号横版封面图，自然光，画面简洁，不要文字，不要水印';
     }
 
     function buildCoverNegativePrompt(userPrompt) {
@@ -1115,6 +1210,10 @@
 
     async function generateAiCover() {
       const userPrompt = $('coverPrompt').value.trim();
+      if (/黑底|纯黑|白色字|白字|文字|字[：:]|标题[：:]/.test(userPrompt)) {
+        renderPromptTextCover(userPrompt);
+        return;
+      }
       const prompt = buildCoverPrompt(userPrompt);
       try {
         log('开始生成公众号 AI 封面图...');
@@ -1177,9 +1276,9 @@
     }
 
     async function generateVideo() {
-      const prompt = $('mediaPrompt').value.trim();
+      const prompt = $('videoPrompt').value.trim();
       if (!prompt) {
-        alert('请先填写正文插图 / 视频提示词。');
+        alert('请先填写视频提示词。');
         return;
       }
       log('开始请求 AI 视频生成...');
