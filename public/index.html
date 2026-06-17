@@ -164,6 +164,55 @@
       padding-top: 12px;
       border-top: 1px solid var(--line);
     }
+    .history-panel {
+      margin-top: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+      overflow: hidden;
+    }
+    .history-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--line);
+      font-weight: 800;
+    }
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 10px;
+      max-height: 260px;
+      overflow: auto;
+    }
+    .history-item {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 8px;
+      align-items: center;
+      padding: 9px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fff;
+    }
+    .history-title {
+      font-weight: 800;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .history-time {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .history-empty {
+      color: var(--muted);
+      padding: 14px;
+    }
     .upload-row {
       display: flex;
       gap: 8px;
@@ -381,7 +430,17 @@
           <button onclick="importPastedArticle()">导入粘贴内容</button>
           <button onclick="insertGeneratedImage()">插入选中图片</button>
           <button onclick="useGeneratedImageAsCover()">设为封面</button>
+          <button onclick="saveCurrentArticle()">保存历史</button>
+          <button onclick="toggleArticleHistory()">历史文章</button>
           <button class="publish" id="publishBtn" onclick="publishDraft()">发布到公众号草稿箱</button>
+        </div>
+
+        <div id="historyPanel" class="history-panel source-collapsed">
+          <div class="history-head">
+            <span>历史文章</span>
+            <button onclick="loadArticleHistory()">刷新</button>
+          </div>
+          <div id="historyList" class="history-list"></div>
         </div>
 
         <div class="asset-panel">
@@ -446,6 +505,7 @@
     let currentImagePrompts = [];
     let visualBlocks = [];
     let visualDragIndex = null;
+    let currentArticleId = '';
 
     function log(message) {
       const time = new Date().toLocaleTimeString('zh-CN');
@@ -715,6 +775,108 @@
         return data;
       } finally {
         clearTimeout(timer);
+      }
+    }
+
+    function formatHistoryTime(value) {
+      if (!value) return '';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      return date.toLocaleString('zh-CN', { hour12: false });
+    }
+
+    function renderHistoryList(articles = []) {
+      const box = $('historyList');
+      if (!box) return;
+      if (!articles.length) {
+        box.innerHTML = '<div class="history-empty">还没有保存过文章。</div>';
+        return;
+      }
+      box.innerHTML = articles.map(item => `
+        <div class="history-item">
+          <div>
+            <div class="history-title">${escapeHtml(item.title || '未命名文章')}</div>
+            <div class="history-time">${escapeHtml(formatHistoryTime(item.updatedAt || item.createdAt))}</div>
+          </div>
+          <button onclick="loadSavedArticle('${escapeHtml(item.id)}')">打开</button>
+          <button onclick="deleteSavedArticle('${escapeHtml(item.id)}')">删除</button>
+        </div>
+      `).join('');
+    }
+
+    async function loadArticleHistory() {
+      try {
+        const data = await api('/api/articles/list', {}, 20000);
+        renderHistoryList(data.articles || []);
+      } catch (err) {
+        log(`历史文章读取失败：${err.message}`);
+        alert(err.message);
+      }
+    }
+
+    async function toggleArticleHistory() {
+      const panel = $('historyPanel');
+      if (!panel) return;
+      panel.classList.toggle('source-collapsed');
+      if (!panel.classList.contains('source-collapsed')) await loadArticleHistory();
+    }
+
+    async function saveCurrentArticle() {
+      if (!$('title').value.trim() && !$('markdown').value.trim()) {
+        return alert('先写一点内容再保存。');
+      }
+      try {
+        const data = await api('/api/articles/save', {
+          id: currentArticleId,
+          title: $('title').value,
+          summary: $('summary').value,
+          markdown: $('markdown').value,
+          coverDataUrl
+        }, 30000);
+        currentArticleId = data.article.id;
+        log('历史文章已保存。');
+        if (!$('historyPanel').classList.contains('source-collapsed')) await loadArticleHistory();
+      } catch (err) {
+        log(`历史文章保存失败：${err.message}`);
+        alert(err.message);
+      }
+    }
+
+    async function loadSavedArticle(id) {
+      try {
+        const data = await api('/api/articles/load', { id }, 20000);
+        const article = data.article;
+        currentArticleId = article.id;
+        $('title').value = article.title || '';
+        $('summary').value = article.summary || '';
+        $('markdown').value = article.markdown || '';
+        coverDataUrl = article.coverDataUrl || '';
+        const preview = $('coverPreview');
+        if (coverDataUrl) {
+          preview.src = coverDataUrl;
+          preview.style.display = 'block';
+        } else {
+          preview.removeAttribute('src');
+          preview.style.display = 'none';
+        }
+        refreshPreview();
+        log(`已打开历史文章：${article.title || '未命名文章'}`);
+      } catch (err) {
+        log(`历史文章打开失败：${err.message}`);
+        alert(err.message);
+      }
+    }
+
+    async function deleteSavedArticle(id) {
+      if (!confirm('确定删除这篇历史文章吗？')) return;
+      try {
+        await api('/api/articles/delete', { id }, 20000);
+        if (currentArticleId === id) currentArticleId = '';
+        await loadArticleHistory();
+        log('历史文章已删除。');
+      } catch (err) {
+        log(`历史文章删除失败：${err.message}`);
+        alert(err.message);
       }
     }
 

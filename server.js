@@ -6,6 +6,8 @@ const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, 'public');
 const CONFIG_PATH = path.join(ROOT, 'config.local.json');
 const EXAMPLE_CONFIG_PATH = path.join(ROOT, 'config.example.json');
+const DATA_DIR = path.join(ROOT, 'data');
+const ARTICLES_PATH = path.join(DATA_DIR, 'articles.json');
 const BODY_LIMIT = 25 * 1024 * 1024;
 
 let tokenCache = null;
@@ -29,6 +31,49 @@ function loadConfig() {
     wechat: { ...(example.wechat || {}), ...(local.wechat || {}) },
     ai: { ...(example.ai || {}), ...(local.ai || {}) },
   };
+}
+
+function ensureDataDir() {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+function readArticles() {
+  const data = readJson(ARTICLES_PATH, []);
+  return Array.isArray(data) ? data : [];
+}
+
+function writeArticles(items) {
+  ensureDataDir();
+  fs.writeFileSync(ARTICLES_PATH, JSON.stringify(items, null, 2));
+}
+
+function articleSummary(item) {
+  return {
+    id: item.id,
+    title: item.title || '未命名文章',
+    summary: item.summary || '',
+    updatedAt: item.updatedAt,
+    createdAt: item.createdAt,
+  };
+}
+
+function saveArticle(body) {
+  const now = new Date().toISOString();
+  const articles = readArticles();
+  const id = body.id || `article-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const current = articles.find(item => item.id === id);
+  const item = {
+    id,
+    title: String(body.title || '').trim() || '未命名文章',
+    summary: String(body.summary || ''),
+    markdown: String(body.markdown || ''),
+    coverDataUrl: String(body.coverDataUrl || ''),
+    createdAt: current?.createdAt || now,
+    updatedAt: now,
+  };
+  const next = [item, ...articles.filter(old => old.id !== id)].slice(0, 100);
+  writeArticles(next);
+  return item;
 }
 
 function sendJson(res, status, data) {
@@ -553,6 +598,36 @@ async function handleApi(req, res, config) {
   }
 
   if (!requireAuth(req, config)) return sendJson(res, 401, { error: '发布口令不正确' });
+
+  if (req.method === 'POST' && req.url === '/api/articles/list') {
+    return sendJson(res, 200, {
+      ok: true,
+      articles: readArticles().map(articleSummary),
+    });
+  }
+
+  if (req.method === 'POST' && req.url === '/api/articles/save') {
+    const body = await readBody(req);
+    const article = saveArticle(body);
+    return sendJson(res, 200, { ok: true, article });
+  }
+
+  if (req.method === 'POST' && req.url === '/api/articles/load') {
+    const body = await readBody(req);
+    const article = readArticles().find(item => item.id === body.id);
+    if (!article) return sendJson(res, 404, { error: '文章不存在' });
+    return sendJson(res, 200, { ok: true, article });
+  }
+
+  if (req.method === 'POST' && req.url === '/api/articles/delete') {
+    const body = await readBody(req);
+    const id = String(body.id || '');
+    const articles = readArticles();
+    const next = articles.filter(item => item.id !== id);
+    if (next.length === articles.length) return sendJson(res, 404, { error: '文章不存在' });
+    writeArticles(next);
+    return sendJson(res, 200, { ok: true });
+  }
 
   if (req.method === 'POST' && req.url === '/api/wechat/test-token') {
     const token = await getAccessToken(config, true);
