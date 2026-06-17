@@ -131,6 +131,22 @@
       line-height: 1.7;
       white-space: pre-wrap;
     }
+    .video-result {
+      display: none;
+      margin-top: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: #f8fafc;
+    }
+    .video-result video {
+      width: 100%;
+      max-height: 260px;
+      display: block;
+      border-radius: 7px;
+      background: #000;
+    }
+    .video-result .actions { margin-top: 8px; }
     .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 999px; background: #e0f2fe; color: #075985; font-size: 12px; }
     .generated-image {
       width: 100%;
@@ -453,6 +469,15 @@
         </div>
 
         <div class="log" id="log">等待操作...</div>
+        <div id="videoResult" class="video-result">
+          <label>视频结果</label>
+          <video id="videoPreview" controls></video>
+          <div class="actions">
+            <button onclick="checkCurrentVideoStatus()">刷新视频状态</button>
+            <button onclick="openCurrentVideo()">打开视频链接</button>
+          </div>
+          <div class="hint" id="videoStatusText"></div>
+        </div>
       </div>
     </section>
 
@@ -570,6 +595,9 @@
     let visualDragIndex = null;
     let selectedVisualIndex = -1;
     let currentArticleId = '';
+    let currentVideoTask = null;
+    let currentVideoUrl = '';
+    let videoPollTimer = 0;
 
     function log(message) {
       const time = new Date().toLocaleTimeString('zh-CN');
@@ -1569,6 +1597,73 @@
       img.src = dataUrl;
     }
 
+    function extractVideoUrl(data) {
+      if (!data || typeof data !== 'object') return '';
+      return data.url
+        || data.video_url
+        || data.output_url
+        || data.remixed_from_video_id
+        || data.data?.url
+        || data.data?.video_url
+        || '';
+    }
+
+    function setVideoStatus(message) {
+      const box = $('videoResult');
+      if (box) box.style.display = 'block';
+      if ($('videoStatusText')) $('videoStatusText').textContent = message;
+    }
+
+    function showVideoResult(url, message = '视频已生成。') {
+      currentVideoUrl = url;
+      const video = $('videoPreview');
+      if (video) {
+        video.src = url;
+        video.style.display = 'block';
+      }
+      setVideoStatus(message);
+    }
+
+    async function checkCurrentVideoStatus() {
+      if (!currentVideoTask) return alert('还没有视频任务。');
+      const data = await api('/api/ai/video-status', currentVideoTask, 60000);
+      const result = data.data || {};
+      const status = result.status || result.state || 'unknown';
+      const progress = result.progress ?? result.percent ?? '';
+      const videoUrl = extractVideoUrl(result);
+      if (videoUrl && (status === 'completed' || status === 'succeeded' || progress === 100)) {
+        clearTimeout(videoPollTimer);
+        showVideoResult(videoUrl, `视频已生成：${status}，进度 ${progress || 100}%`);
+        log(`视频已生成：${videoUrl}`);
+        return result;
+      }
+      if (result.error) {
+        clearTimeout(videoPollTimer);
+        setVideoStatus(`视频生成失败：${JSON.stringify(result.error).slice(0, 180)}`);
+        return result;
+      }
+      setVideoStatus(`视频生成中：${status}，进度 ${progress || 0}%`);
+      return result;
+    }
+
+    function pollCurrentVideoStatus() {
+      clearTimeout(videoPollTimer);
+      videoPollTimer = setTimeout(async () => {
+        try {
+          const result = await checkCurrentVideoStatus();
+          const done = extractVideoUrl(result) && (result.status === 'completed' || result.status === 'succeeded' || result.progress === 100);
+          if (!done && !result?.error) pollCurrentVideoStatus();
+        } catch (err) {
+          setVideoStatus(`查询视频状态失败：${err.message}`);
+        }
+      }, 10000);
+    }
+
+    function openCurrentVideo() {
+      if (!currentVideoUrl) return alert('视频还没生成完成。');
+      window.open(currentVideoUrl, '_blank');
+    }
+
     async function generateVideo() {
       const prompt = $('videoPrompt').value.trim();
       if (!prompt) {
@@ -1583,6 +1678,13 @@
         return;
       }
       log(`视频任务已提交：${JSON.stringify(data.data).slice(0, 300)}`);
+      currentVideoTask = {
+        video_id: data.data?.video_id || data.data?.videoId || data.data?.id,
+        task_id: data.data?.task_id || data.data?.taskId || data.data?.id
+      };
+      setVideoStatus('视频任务已提交，正在生成中...');
+      await checkCurrentVideoStatus();
+      pollCurrentVideoStatus();
     }
 
     async function testToken() {
