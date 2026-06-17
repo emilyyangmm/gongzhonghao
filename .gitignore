@@ -2,4 +2,6 @@ config.local.json
 data/*.json
 *.log
 node_modules/
-
+gongzhonghao-deploy.tgz
+mp.miaomiaoxiaoxianer.cn.conf
+set-gongzhonghao-token.js

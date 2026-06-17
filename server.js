@@ -545,8 +545,7 @@ async function handleApi(req, res, config) {
     try {
       return sendJson(res, 200, await composeArticleWithAi(config, body));
     } catch (err) {
-      const fallback = composeArticle(body);
-      return sendJson(res, 200, { ...fallback, fallback: true, warning: err.message });
+      return sendJson(res, 502, { error: `AI 文章生成失败：${err.message}` });
     }
   }
 

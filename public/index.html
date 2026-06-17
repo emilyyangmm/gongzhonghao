@@ -326,7 +326,9 @@
 
         <label>发布口令</label>
         <input id="token" type="password" placeholder="服务器 config.local.json 里的 publishToken">
-        <div class="hint">部署到公网时必须设置口令。AppSecret 只放服务器配置里，页面不保存公众号密钥。</div>
+        <label>发布后端地址</label>
+        <input id="publishBaseUrl" placeholder="本地生成、服务器发布时填：http://106.53.141.12">
+        <div class="hint">本地写文生图，发布走服务器。AppSecret 只放服务器配置里，页面不保存公众号密钥。</div>
 
         <div class="actions">
           <button class="primary" id="composeBtn" onclick="compose()">AI生成文章</button>
@@ -615,14 +617,24 @@
       $('markdown').classList.toggle('source-collapsed');
     }
 
-    async function api(path, body = {}, timeout = 30000) {
+    function buildApiUrl(path, baseUrl = '') {
+      const base = String(baseUrl || '').trim().replace(/\/+$/, '');
+      if (!base) return path;
+      return `${base}${path.startsWith('/') ? path : `/${path}`}`;
+    }
+
+    function publishApiBase() {
+      return $('publishBaseUrl')?.value.trim() || '';
+    }
+
+    async function api(path, body = {}, timeout = 30000, baseUrl = '') {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeout);
       try {
         const headers = { 'Content-Type': 'application/json' };
         const token = $('token').value.trim();
         if (token) headers['X-Publish-Token'] = token;
-        const res = await fetch(path, { method: 'POST', headers, body: JSON.stringify(body), signal: controller.signal });
+        const res = await fetch(buildApiUrl(path, baseUrl), { method: 'POST', headers, body: JSON.stringify(body), signal: controller.signal });
         const data = await res.json();
         if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
         return data;
@@ -1182,7 +1194,7 @@
 
     async function testToken() {
       log('测试微信接口连接...');
-      const data = await api('/api/wechat/test-token', {}, 20000);
+      const data = await api('/api/wechat/test-token', {}, 20000, publishApiBase());
       log(`微信连接正常：${data.tokenPreview}`);
     }
 
@@ -1200,7 +1212,7 @@
           markdown: $('markdown').value,
           html: currentHtml,
           coverDataUrl
-        }, 60000);
+        }, 60000, publishApiBase());
         log(`发布成功：${data.message}`);
         log(`media_id: ${data.mediaId}`);
       } catch (err) {
