@@ -168,18 +168,56 @@
       font-size: 12px;
     }
     .drop-ready { border-color: var(--brand) !important; box-shadow: 0 0 0 3px rgba(15,139,141,.12); }
-    .placeholder-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
-    .placeholder-item { border: 1px solid var(--line); border-radius: 7px; padding: 8px; background: #f8fafc; }
-    .placeholder-item div { color: var(--muted); font-size: 12px; line-height: 1.45; margin-bottom: 6px; }
+    .placeholder-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .placeholder-item {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 7px;
+      background: #f8fafc;
+      min-height: 78px;
+    }
+    .placeholder-item div {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      margin-bottom: 6px;
+      height: 34px;
+      overflow: hidden;
+    }
+    .placeholder-item button { padding: 6px 8px; font-size: 12px; }
     .asset-panel {
       margin-top: 14px;
-      padding-top: 12px;
-      border-top: 1px solid var(--line);
+      border: 1px solid var(--line);
+      border-radius: 8px 8px 0 0;
       position: sticky;
-      bottom: -14px;
+      bottom: -1px;
       z-index: 4;
       background: var(--panel);
       box-shadow: 0 -10px 22px rgba(15, 23, 42, .06);
+    }
+    .asset-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+      font-weight: 800;
+    }
+    .asset-head button { padding: 4px 8px; min-width: 34px; }
+    .asset-content {
+      padding: 10px;
+      max-height: 390px;
+      overflow: auto;
+    }
+    .asset-panel.collapsed .asset-content { display: none; }
+    .asset-panel.collapsed {
+      box-shadow: 0 -4px 12px rgba(15, 23, 42, .05);
     }
     .history-panel {
       margin-top: 12px;
@@ -351,6 +389,7 @@
       main { grid-template-columns: 1fr; height: auto; }
       section { min-height: auto; }
       .body { height: auto; }
+      .placeholder-list { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -461,18 +500,24 @@
           <div id="historyList" class="history-list"></div>
         </div>
 
-        <div class="asset-panel">
-          <label>文章插图建议</label>
-          <div id="placeholderList" class="placeholder-list"></div>
-
-          <label>图片素材库</label>
-          <div class="upload-row">
-            <input id="uploadImageInput" type="file" accept="image/*" multiple>
-            <button onclick="handleImageUpload()">上传本地图片</button>
-            <button onclick="generateAiImage()">AI生成插图</button>
+        <div id="assetPanel" class="asset-panel">
+          <div class="asset-head">
+            <span>插图素材</span>
+            <button id="assetToggle" onclick="toggleAssetPanel()">▼</button>
           </div>
-          <div class="hint">素材库里的图片可以拖进正文，也可以点选后插入正文或设为封面。</div>
-          <div id="imageLibrary" class="image-library"></div>
+          <div id="assetContent" class="asset-content">
+            <label>文章插图建议</label>
+            <div id="placeholderList" class="placeholder-list"></div>
+
+            <label>图片素材库</label>
+            <div class="upload-row">
+              <input id="uploadImageInput" type="file" accept="image/*" multiple>
+              <button onclick="handleImageUpload()">上传本地图片</button>
+              <button onclick="generateAiImage()">AI生成插图</button>
+            </div>
+            <div class="hint">素材库里的图片可以拖进正文，也可以点选后插入正文或设为封面。</div>
+            <div id="imageLibrary" class="image-library"></div>
+          </div>
         </div>
       </div>
     </section>
@@ -1076,6 +1121,15 @@
       $('imageAssistant')?.classList.remove('open');
     }
 
+    function toggleAssetPanel(forceOpen = false) {
+      const panel = $('assetPanel');
+      if (!panel) return;
+      if (forceOpen) panel.classList.remove('collapsed');
+      else panel.classList.toggle('collapsed');
+      const collapsed = panel.classList.contains('collapsed');
+      if ($('assetToggle')) $('assetToggle').textContent = collapsed ? '▲' : '▼';
+    }
+
     function useAssistantPrompt(index) {
       const prompt = currentImagePrompts[index];
       if (!prompt) return;
@@ -1119,6 +1173,7 @@
       generatedImages.push({ dataUrl, prompt: prompt || 'AI生成插图' });
       selectedImageIndex = generatedImages.length - 1;
       generatedImageDataUrl = dataUrl;
+      toggleAssetPanel(true);
       renderImageLibrary();
       renderAssistantImageLibrary();
     }
