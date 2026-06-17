@@ -295,12 +295,12 @@
       <div class="section-head">生成设置 <span class="pill">草稿箱优先</span></div>
       <div class="body">
         <label>选题</label>
-        <textarea id="topic" placeholder="例：为什么地产招采人适合用 AI 做个人主页和获客工具"></textarea>
+        <textarea id="topic" placeholder="例：介绍一个公众号 AI 工作台，如何从选题、配图、排版到保存草稿箱"></textarea>
 
         <div class="row">
           <div>
             <label>目标读者</label>
-            <input id="audience" value="地产、工程、招采、造价从业者">
+            <input id="audience" value="公众号运营者、内容创作者、小团队负责人">
           </div>
           <div>
             <label>语气</label>
@@ -314,7 +314,7 @@
         </div>
 
         <label>必须写进去的要点</label>
-        <textarea id="points" placeholder="一行一个要点。比如：一级造价师背景、腾讯云服务器、公众号草稿箱、用AI做内容矩阵"></textarea>
+        <textarea id="points" placeholder="一行一个要点。比如：AI生成文章、封面图、正文配图、可视排版、一键保存草稿箱"></textarea>
 
         <label>封面图提示词</label>
         <textarea id="coverPrompt" placeholder="例：一张干净爽朗的风景图。AI封面只看这里，不参考文章内容"></textarea>
@@ -974,7 +974,7 @@
       ctx.fillText('喵喵小仙儿', 70, 342);
       ctx.fillStyle = '#94a3b8';
       ctx.font = '20px Microsoft YaHei, sans-serif';
-      ctx.fillText('AI × 地产招采 × 个人IP', 218, 342);
+      ctx.fillText('AI × 内容创作 × 公众号', 218, 342);
       coverDataUrl = canvas.toDataURL('image/png');
       const preview = $('coverPreview');
       preview.src = coverDataUrl;

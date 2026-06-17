@@ -181,13 +181,13 @@ function extractJsonObject(text) {
 async function composeArticleWithAi(config, body) {
   const ai = getAiConfig(config);
   const topic = body.topic?.trim() || '公众号文章选题';
-  const audience = body.audience?.trim() || '地产、工程、招采、造价从业者';
+  const audience = body.audience?.trim() || '公众号运营者、内容创作者、小团队负责人';
   const tone = body.tone?.trim() || '清楚、接地气、有判断';
   const points = body.points?.trim() || '';
   const system = [
     '你是微信公众号文章写作助手。',
-    '用户是地产招采和造价背景，正在做 AI 工具和个人 IP。',
-    '文章要像真人写的，清楚、接地气、有逻辑，少空话。',
+    '不要默认套用任何固定行业、人设或职业背景。只根据用户填写的选题、目标读者、语气和要点写作。',
+    '文章要像真人写的，清楚、接地气、有逻辑，少空话，适合微信公众号阅读。',
     '输出必须是严格 JSON，不要 Markdown 代码块。',
     'JSON 字段：title、summary、markdown、imagePrompts。',
     'markdown 里不要放封面图，但可以在合适位置预留 3-5 个插图提示，格式为：<!-- image: 描述 -->。',
@@ -205,7 +205,7 @@ ${points}
 2. 摘要 60-120 字。
 3. 正文 1200-2200 字，Markdown 格式。
 4. 小标题清楚，不要营销腔。
-5. 结合地产招采、造价、AI 工具、个人成长的真实语境。`;
+5. 严格围绕用户输入的信息展开，不要自行添加地产、造价、招采、个人IP等未提供的背景。`;
 
   const res = await fetch(`${ai.baseUrl}/chat/completions`, {
     method: 'POST',
