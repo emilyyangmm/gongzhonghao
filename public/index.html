@@ -144,6 +144,8 @@
       grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 10px;
       margin-top: 10px;
+      max-height: 250px;
+      overflow: auto;
     }
     .image-card {
       border: 1px solid var(--line);
@@ -153,8 +155,18 @@
       cursor: grab;
     }
     .image-card.selected { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(15,139,141,.12); }
-    .image-card img { width: 100%; display: block; aspect-ratio: 1 / 1; object-fit: cover; }
-    .image-card .caption { padding: 7px 8px; font-size: 11px; color: var(--muted); line-height: 1.35; height: 46px; overflow: hidden; }
+    .image-card img { width: 100%; display: block; aspect-ratio: 4 / 3; object-fit: cover; }
+    .image-card .caption { padding: 7px 8px; font-size: 11px; color: var(--muted); line-height: 1.35; height: 42px; overflow: hidden; }
+    .image-card-actions {
+      display: flex;
+      gap: 6px;
+      padding: 0 7px 7px;
+    }
+    .image-card-actions button {
+      flex: 1;
+      padding: 5px 6px;
+      font-size: 12px;
+    }
     .drop-ready { border-color: var(--brand) !important; box-shadow: 0 0 0 3px rgba(15,139,141,.12); }
     .placeholder-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
     .placeholder-item { border: 1px solid var(--line); border-radius: 7px; padding: 8px; background: #f8fafc; }
@@ -163,6 +175,11 @@
       margin-top: 14px;
       padding-top: 12px;
       border-top: 1px solid var(--line);
+      position: sticky;
+      bottom: -14px;
+      z-index: 4;
+      background: var(--panel);
+      box-shadow: 0 -10px 22px rgba(15, 23, 42, .06);
     }
     .history-panel {
       margin-top: 12px;
@@ -259,7 +276,8 @@
       background: #fff;
     }
     .visual-block:hover,
-    .visual-block.drag-over {
+    .visual-block.drag-over,
+    .visual-block.active {
       border-color: var(--brand);
       box-shadow: 0 0 0 3px rgba(15,139,141,.10);
     }
@@ -505,6 +523,7 @@
     let currentImagePrompts = [];
     let visualBlocks = [];
     let visualDragIndex = null;
+    let selectedVisualIndex = -1;
     let currentArticleId = '';
 
     function log(message) {
@@ -629,7 +648,7 @@
       box.innerHTML = visualBlocks.map((block, i) => {
         if (block.type === 'image') {
           return `
-            <div class="visual-block visual-image" draggable="true" data-index="${i}" ondragstart="startVisualDrag(event, ${i})" ondragover="overVisualBlock(event)" ondragleave="leaveVisualBlock(event)" ondrop="dropVisualBlock(event, ${i})">
+            <div class="visual-block visual-image ${i === selectedVisualIndex ? 'active' : ''}" draggable="true" data-index="${i}" onclick="setActiveVisualBlock(${i})" ondragstart="startVisualDrag(event, ${i})" ondragover="overVisualBlock(event)" ondragleave="leaveVisualBlock(event)" ondrop="dropVisualBlock(event, ${i})">
               <img src="${block.src}" alt="${escapeHtml(block.alt)}">
               <div class="visual-image-bar">
                 <span>拖动图片调整位置</span>
@@ -639,9 +658,16 @@
           `;
         }
         return `
-          <div class="visual-block visual-text" draggable="true" contenteditable="true" data-index="${i}" oninput="updateVisualText(${i}, this.innerText)" ondragstart="startVisualDrag(event, ${i})" ondragover="overVisualBlock(event)" ondragleave="leaveVisualBlock(event)" ondrop="dropVisualBlock(event, ${i})">${escapeHtml(block.text)}</div>
+          <div class="visual-block visual-text ${i === selectedVisualIndex ? 'active' : ''}" draggable="true" contenteditable="true" data-index="${i}" onclick="setActiveVisualBlock(${i})" oninput="updateVisualText(${i}, this.innerText)" ondragstart="startVisualDrag(event, ${i})" ondragover="overVisualBlock(event)" ondragleave="leaveVisualBlock(event)" ondrop="dropVisualBlock(event, ${i})">${escapeHtml(block.text)}</div>
         `;
       }).join('');
+    }
+
+    function setActiveVisualBlock(index) {
+      selectedVisualIndex = index;
+      document.querySelectorAll('.visual-block').forEach(el => {
+        el.classList.toggle('active', Number(el.dataset.index) === index);
+      });
     }
 
     function updateVisualText(index, text) {
@@ -687,15 +713,23 @@
 
     function removeVisualBlock(index) {
       visualBlocks.splice(index, 1);
+      if (selectedVisualIndex >= visualBlocks.length) selectedVisualIndex = visualBlocks.length - 1;
       syncVisualToMarkdown();
       renderVisualEditor();
     }
 
     function addImageBlockToVisual(item) {
       visualBlocks = parseVisualBlocks($('markdown').value);
-      visualBlocks.push({ type: 'image', alt: item.prompt || '文章配图', src: item.dataUrl });
+      const insertAt = selectedVisualIndex >= 0 && selectedVisualIndex < visualBlocks.length
+        ? selectedVisualIndex + 1
+        : visualBlocks.length;
+      visualBlocks.splice(insertAt, 0, { type: 'image', alt: item.prompt || '文章配图', src: item.dataUrl });
+      selectedVisualIndex = insertAt;
       syncVisualToMarkdown();
       renderVisualEditor();
+      requestAnimationFrame(() => {
+        document.querySelector(`.visual-block[data-index="${insertAt}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
     }
 
     function toggleSource() {
@@ -1073,6 +1107,10 @@
         <div class="image-card ${i === selectedImageIndex ? 'selected' : ''}" draggable="true" onclick="selectImage(${i})" ondragstart="dragImage(event, ${i})">
           <img src="${item.dataUrl}" alt="${escapeHtml(item.prompt)}">
           <div class="caption">${escapeHtml(item.prompt)}</div>
+          <div class="image-card-actions">
+            <button onclick="event.stopPropagation(); insertImageByIndex(${i})">插入</button>
+            <button onclick="event.stopPropagation(); useImageAsCoverByIndex(${i})">封面</button>
+          </div>
         </div>
       `).join('');
     }
@@ -1096,6 +1134,10 @@
         <div class="image-card ${i === selectedImageIndex ? 'selected' : ''}" draggable="true" onclick="selectImage(${i})" ondragstart="dragImage(event, ${i})">
           <img src="${item.dataUrl}" alt="${escapeHtml(item.prompt)}">
           <div class="caption">${escapeHtml(item.prompt)}</div>
+          <div class="image-card-actions">
+            <button onclick="event.stopPropagation(); insertImageByIndex(${i})">插入</button>
+            <button onclick="event.stopPropagation(); useImageAsCoverByIndex(${i})">封面</button>
+          </div>
         </div>
       `).join('');
     }
@@ -1105,6 +1147,23 @@
       generatedImageDataUrl = generatedImages[index]?.dataUrl || '';
       renderImageLibrary();
       renderAssistantImageLibrary();
+    }
+
+    function insertImageByIndex(index) {
+      const item = generatedImages[index];
+      if (!item) return;
+      selectedImageIndex = index;
+      generatedImageDataUrl = item.dataUrl;
+      addImageBlockToVisual(item);
+      log('图片已插入到正文当前位置。');
+    }
+
+    function useImageAsCoverByIndex(index) {
+      const item = generatedImages[index];
+      if (!item) return;
+      selectedImageIndex = index;
+      generatedImageDataUrl = item.dataUrl;
+      applyImageAsCover(item.dataUrl);
     }
 
     function dragImage(event, index) {
@@ -1165,6 +1224,24 @@
         visualBlocks.push({ type: 'image', alt: imageMatch[1] || '文章配图', src: imageMatch[2] });
         syncVisualToMarkdown();
         renderVisualEditor();
+      });
+    }
+
+    function setupDragAutoScroll() {
+      let frame = 0;
+      document.addEventListener('dragover', event => {
+        const body = event.target.closest?.('.body');
+        if (!body) return;
+        const rect = body.getBoundingClientRect();
+        const edge = 70;
+        let delta = 0;
+        if (event.clientY < rect.top + edge) delta = -18;
+        if (event.clientY > rect.bottom - edge) delta = 18;
+        if (!delta || frame) return;
+        frame = requestAnimationFrame(() => {
+          body.scrollTop += delta;
+          frame = 0;
+        });
       });
     }
 
@@ -1492,6 +1569,7 @@
     renderAssistantImageLibrary();
     setupMarkdownDrop();
     setupVisualEditorDrop();
+    setupDragAutoScroll();
   </script>
 </body>
 </html>
