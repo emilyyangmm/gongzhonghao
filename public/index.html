@@ -473,7 +473,7 @@
         <textarea id="coverPrompt" placeholder="例：一张干净爽朗的风景图。AI封面只看这里，不参考文章内容"></textarea>
         <div class="hint">公众号封面图只按这里生成，不读取文章标题、摘要、正文、目标读者或行业背景。</div>
 
-        <label>正文插图 / 视频提示词</label>
+        <label>正文插图提示词</label>
         <textarea id="mediaPrompt" placeholder="例：一张清爽的公众号插图，表现一个工作流从选题到草稿箱的过程"></textarea>
         <div class="hint">这里用于正文插图，不会影响公众号封面。</div>
 
@@ -1486,7 +1486,7 @@
     async function generateAiImage(promptOverride = '') {
       const prompt = String(promptOverride || $('mediaPrompt').value).trim();
       if (!prompt) {
-        alert('请先填写正文插图 / 视频提示词，或点击文章插图建议里的“生成这张图”。');
+        alert('请先填写正文插图提示词，或点击文章插图建议里的“生成这张图”。');
         return;
       }
       $('mediaPrompt').value = prompt;
