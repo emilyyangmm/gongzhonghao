@@ -445,7 +445,7 @@
 
   <main>
     <section>
-      <div class="section-head">生成设置 <span class="pill">草稿箱优先</span></div>
+      <div class="section-head">要求区 <span class="pill">草稿箱优先</span></div>
       <div class="body">
         <label>选题</label>
         <textarea id="topic" placeholder="例：介绍一个公众号 AI 工作台，如何从选题、配图、排版到保存草稿箱"></textarea>
@@ -495,23 +495,11 @@
           <button onclick="generateVideo()">生成视频</button>
           <button onclick="testToken()">测试微信连接</button>
         </div>
-
-        <div class="log" id="log">等待操作...</div>
-        <div id="videoResult" class="video-result">
-          <label>视频结果</label>
-          <video id="videoPreview" controls></video>
-          <div class="actions">
-            <button onclick="checkCurrentVideoStatus()">刷新视频状态</button>
-            <button onclick="openCurrentVideo()">打开视频链接</button>
-            <button onclick="insertCurrentVideo()">插入正文</button>
-          </div>
-          <div class="hint" id="videoStatusText"></div>
-        </div>
       </div>
     </section>
 
     <section>
-      <div class="section-head">文章编辑</div>
+      <div class="section-head">生成区</div>
       <div class="body">
         <input class="editor-title" id="title" placeholder="标题">
         <label>摘要</label>
@@ -552,6 +540,18 @@
             <button onclick="loadArticleHistory()">刷新</button>
           </div>
           <div id="historyList" class="history-list"></div>
+        </div>
+
+        <div class="log" id="log">等待操作...</div>
+        <div id="videoResult" class="video-result">
+          <label>视频结果</label>
+          <video id="videoPreview" controls></video>
+          <div class="actions">
+            <button onclick="checkCurrentVideoStatus()">刷新视频状态</button>
+            <button onclick="openCurrentVideo()">打开视频链接</button>
+            <button onclick="insertCurrentVideo()">插入正文</button>
+          </div>
+          <div class="hint" id="videoStatusText"></div>
         </div>
 
         <div id="assetPanel" class="asset-panel">
