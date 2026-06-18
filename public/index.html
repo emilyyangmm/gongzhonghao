@@ -147,6 +147,27 @@
       background: #000;
     }
     .video-result .actions { margin-top: 8px; }
+    .article-video {
+      margin: 14px 0;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+    .article-video video {
+      width: 100%;
+      max-height: 360px;
+      display: block;
+      border-radius: 7px;
+      background: #000;
+    }
+    .article-video a {
+      display: inline-block;
+      margin-top: 8px;
+      color: var(--brand2);
+      font-weight: 800;
+      text-decoration: none;
+    }
     .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 999px; background: #e0f2fe; color: #075985; font-size: 12px; }
     .generated-image {
       width: 100%;
@@ -348,6 +369,13 @@
       border-radius: 8px;
       background: #f8fafc;
     }
+    .visual-video video {
+      width: 100%;
+      max-height: 360px;
+      display: block;
+      border-radius: 8px;
+      background: #000;
+    }
     .visual-image-bar {
       display: flex;
       justify-content: space-between;
@@ -475,6 +503,7 @@
           <div class="actions">
             <button onclick="checkCurrentVideoStatus()">刷新视频状态</button>
             <button onclick="openCurrentVideo()">打开视频链接</button>
+            <button onclick="insertCurrentVideo()">插入正文</button>
           </div>
           <div class="hint" id="videoStatusText"></div>
         </div>
@@ -640,6 +669,14 @@
         if (t.startsWith('## ')) { flush(); blocks.push(`<h2>${inlineMarkdown(t.slice(3))}</h2>`); continue; }
         if (t.startsWith('### ')) { flush(); blocks.push(`<h3>${inlineMarkdown(t.slice(4))}</h3>`); continue; }
         if (t.startsWith('> ')) { flush(); blocks.push(`<blockquote>${inlineMarkdown(t.slice(2))}</blockquote>`); continue; }
+        const videoMatch = t.match(/^@\[video(?::\s*(.*?))?\]\((.*?)\)$/);
+        if (videoMatch) {
+          flush();
+          const title = videoMatch[1] || '视频';
+          const url = videoMatch[2];
+          blocks.push(`<section class="article-video" style="margin:14px 0;padding:10px;border:1px solid #d9e2ec;border-radius:8px;background:#f8fafc;"><video src="${escapeHtml(url)}" controls style="width:100%;max-height:360px;display:block;border-radius:7px;background:#000;"></video><a href="${escapeHtml(url)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:8px;color:#146c94;font-weight:800;text-decoration:none;">${inlineMarkdown(title)}：打开视频链接</a></section>`);
+          continue;
+        }
         const imageMatch = t.match(/^!\[(.*?)\]\((.*?)\)$/);
         if (imageMatch) {
           flush();
@@ -686,6 +723,12 @@
           flush();
           continue;
         }
+        const videoMatch = t.match(/^@\[video(?::\s*(.*?))?\]\((https?:\/\/[^)]+)\)$/);
+        if (videoMatch) {
+          flush();
+          blocks.push({ type: 'video', title: videoMatch[1] || '视频', src: videoMatch[2] });
+          continue;
+        }
         buffer.push(line);
       }
       flush();
@@ -694,6 +737,7 @@
 
     function visualBlockToMarkdown(block) {
       if (block.type === 'image') return `![${block.alt || '文章配图'}](${block.src})`;
+      if (block.type === 'video') return `@[video: ${block.title || '视频'}](${block.src})`;
       return block.text || '';
     }
 
@@ -725,6 +769,17 @@
               <img src="${block.src}" alt="${escapeHtml(block.alt)}">
               <div class="visual-image-bar">
                 <span>拖动图片调整位置</span>
+                <button onclick="removeVisualBlock(${i})">删除</button>
+              </div>
+            </div>
+          `;
+        }
+        if (block.type === 'video') {
+          return `
+            <div class="visual-block visual-video ${i === selectedVisualIndex ? 'active' : ''}" draggable="true" data-index="${i}" onclick="setActiveVisualBlock(${i})" ondragstart="startVisualDrag(event, ${i})" ondragover="overVisualBlock(event)" ondragleave="leaveVisualBlock(event)" ondrop="dropVisualBlock(event, ${i})">
+              <video src="${block.src}" controls></video>
+              <div class="visual-image-bar">
+                <span>${escapeHtml(block.title || '视频')}</span>
                 <button onclick="removeVisualBlock(${i})">删除</button>
               </div>
             </div>
@@ -797,6 +852,21 @@
         ? selectedVisualIndex + 1
         : visualBlocks.length;
       visualBlocks.splice(insertAt, 0, { type: 'image', alt: item.prompt || '文章配图', src: item.dataUrl });
+      selectedVisualIndex = insertAt;
+      syncVisualToMarkdown();
+      renderVisualEditor();
+      requestAnimationFrame(() => {
+        document.querySelector(`.visual-block[data-index="${insertAt}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
+    }
+
+    function addVideoBlockToVisual(url, title = '视频') {
+      if (!url) return;
+      visualBlocks = parseVisualBlocks($('markdown').value);
+      const insertAt = selectedVisualIndex >= 0 && selectedVisualIndex < visualBlocks.length
+        ? selectedVisualIndex + 1
+        : visualBlocks.length;
+      visualBlocks.splice(insertAt, 0, { type: 'video', title, src: url });
       selectedVisualIndex = insertAt;
       syncVisualToMarkdown();
       renderVisualEditor();
@@ -1662,6 +1732,12 @@
     function openCurrentVideo() {
       if (!currentVideoUrl) return alert('视频还没生成完成。');
       window.open(currentVideoUrl, '_blank');
+    }
+
+    function insertCurrentVideo() {
+      if (!currentVideoUrl) return alert('视频还没生成完成。');
+      addVideoBlockToVisual(currentVideoUrl, $('videoPrompt').value.trim() || '视频');
+      log('视频已插入正文当前位置。');
     }
 
     async function generateVideo() {
