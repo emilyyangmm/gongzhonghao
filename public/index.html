@@ -614,6 +614,10 @@
 
   <script>
     const $ = id => document.getElementById(id);
+    const APP_BASE_PATH = (() => {
+      const first = location.pathname.split('/').filter(Boolean)[0] || '';
+      return ['gongzhonghao', 'mp'].includes(first) ? `/${first}` : '';
+    })();
     let coverDataUrl = '';
     let currentHtml = '';
     let generatedImageDataUrl = '';
@@ -931,7 +935,7 @@
 
     function buildApiUrl(path, baseUrl = '') {
       const base = String(baseUrl || '').trim().replace(/\/+$/, '');
-      if (!base) return path;
+      if (!base) return `${APP_BASE_PATH}${path.startsWith('/') ? path : `/${path}`}`;
       return `${base}${path.startsWith('/') ? path : `/${path}`}`;
     }
 
@@ -1082,7 +1086,7 @@
 
     async function checkStatus() {
       try {
-        const res = await fetch('/api/status');
+        const res = await fetch(buildApiUrl('/api/status'));
         const data = await res.json();
         $('statusDot').classList.toggle('ok', data.ok && data.configured);
         $('statusText').textContent = data.configured ? `已配置：${data.account || '公众号'}` : '后端未配置公众号';
