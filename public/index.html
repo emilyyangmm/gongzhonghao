@@ -1017,6 +1017,141 @@
       ['aiBaseUrl', 'aiApiKey', 'aiTextModel', 'aiImageModel', 'aiVideoModel'].forEach(id => $(id)?.addEventListener('input', saveAiSettings));
     }
 
+    function shouldUseDirectAi() {
+      const ai = aiSettings();
+      return Boolean(ai.apiKey && ai.baseUrl && !generateApiBase());
+    }
+
+    async function directAiFetch(endpoint, payload, timeout = 150000) {
+      const ai = aiSettings();
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeout);
+      try {
+        const res = await fetch(ai.baseUrl.replace(/\/+$/, '') + endpoint, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + ai.apiKey,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error?.message || data.message || ('HTTP ' + res.status));
+        return data;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    function extractJsonObject(text) {
+      const raw = String(text || '').trim();
+      try { return JSON.parse(raw); } catch {}
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error('AI did not return JSON');
+      return JSON.parse(match[0]);
+    }
+
+    async function directComposeArticle(body) {
+      const ai = aiSettings();
+      const topic = String(body.topic || '').trim() || '公众号文章选题';
+      const audience = String(body.audience || '').trim() || '公众号读者';
+      const tone = String(body.tone || '').trim() || '清楚、接地气、有判断';
+      const points = String(body.points || '').trim();
+      const system = [
+        'You are a WeChat official account article writing assistant.',
+        'Write in Chinese. Do not invent a fixed industry, persona, or career background.',
+        'Only use the user provided topic, audience, tone, and points.',
+        'Return strict JSON only with fields: title, summary, markdown, imagePrompts.',
+        'In markdown, you may add 3-5 image placeholders using: <!-- image: description -->.'
+      ].join('\n');
+      const user = [
+        'Topic: ' + topic,
+        'Audience: ' + audience,
+        'Tone: ' + tone,
+        'Must include points:',
+        points,
+        '',
+        'Requirements: title 16-28 Chinese characters; summary 60-120 Chinese characters; body 1200-2200 Chinese characters in Markdown; stay strictly within user input.'
+      ].join('\n');
+      const data = await directAiFetch('/chat/completions', {
+        model: ai.textModel || 'agnes-2.0-flash',
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user }
+        ],
+        temperature: 0.75
+      }, 150000);
+      const parsed = extractJsonObject(data.choices?.[0]?.message?.content);
+      const markdown = String(parsed.markdown || '').trim();
+      return {
+        title: String(parsed.title || topic).trim().slice(0, 64),
+        summary: String(parsed.summary || '').trim().slice(0, 120),
+        markdown,
+        imagePrompts: Array.isArray(parsed.imagePrompts) ? parsed.imagePrompts.slice(0, 5) : [],
+        model: ai.textModel || 'agnes-2.0-flash'
+      };
+    }
+
+    async function imageUrlToDataUrl(url) {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    async function directAiImage(prompt, extra = {}) {
+      const ai = aiSettings();
+      const negative = String(extra.negative_prompt || '').trim();
+      const payload = {
+        model: extra.model || ai.imageModel || 'agnes-image-2.1-flash',
+        prompt: negative ? prompt + ', avoid: ' + negative : prompt,
+        size: extra.size || '1024x1024',
+        extra_body: { response_format: 'url' }
+      };
+      const data = await directAiFetch('/images/generations', payload, 150000);
+      const item = Array.isArray(data.data) ? data.data[0] : data;
+      const imageUrl = item?.url || item?.image_url || data.url || data.image_url || data.images?.[0]?.url;
+      const b64 = item?.b64_json || data.b64_json;
+      if (b64) return { ok: true, dataUrl: 'data:image/png;base64,' + b64, model: payload.model };
+      if (imageUrl) {
+        let dataUrl = imageUrl;
+        try { dataUrl = await imageUrlToDataUrl(imageUrl); } catch {}
+        return { ok: true, dataUrl, imageUrl, model: payload.model };
+      }
+      throw new Error('AI did not return an image');
+    }
+
+    async function directAiVideo(prompt) {
+      const ai = aiSettings();
+      const data = await directAiFetch('/videos', {
+        model: ai.videoModel || 'agnes-video-v2.0',
+        prompt,
+        height: 768,
+        width: 1152,
+        num_frames: 121,
+        frame_rate: 24
+      }, 150000);
+      return { ok: true, data };
+    }
+
+    async function directVideoStatus(task) {
+      const ai = aiSettings();
+      const videoId = task.video_id || task.videoId;
+      const taskId = task.task_id || task.taskId;
+      const url = videoId
+        ? 'https://apihub.agnes-ai.com/agnesapi?video_id=' + encodeURIComponent(videoId)
+        : ai.baseUrl.replace(/\/+$/, '') + '/videos/' + encodeURIComponent(taskId);
+      const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + ai.apiKey } });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error?.message || data.message || ('HTTP ' + res.status));
+      return { ok: true, data };
+    }
+
     async function api(path, body = {}, timeout = 30000, baseUrl = '') {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeout);
@@ -1183,12 +1318,15 @@
       btn.textContent = '生成中...';
       log('开始生成文章初稿，Agnes 可能需要 1-2 分钟...');
       try {
-        const data = await api('/api/compose', {
+        const composeBody = {
           topic: $('topic').value,
           audience: $('audience').value,
           tone: $('tone').value,
           points: $('points').value
-        }, 150000, generateApiBase());
+        };
+        const data = shouldUseDirectAi()
+          ? await directComposeArticle(composeBody)
+          : await api('/api/compose', composeBody, 150000, generateApiBase());
         $('title').value = data.title;
         $('summary').value = data.summary;
         $('markdown').value = ensureImagePlaceholders(data.markdown, data.imagePrompts || []);
@@ -1565,6 +1703,7 @@
     }
 
     async function requestAiImage(prompt) {
+      if (shouldUseDirectAi()) return await directAiImage(prompt);
       return await api('/api/ai/image', { prompt }, 120000, generateApiBase());
     }
 
@@ -1695,11 +1834,14 @@
       try {
         log('开始生成公众号 AI 封面图...');
         log(`封面提示词：${userPrompt || '默认风景图'}`);
-        const data = await api('/api/ai/image', {
+        const imagePayload = {
           prompt,
           size: '1024x768',
           negative_prompt: buildCoverNegativePrompt(userPrompt)
-        }, 120000, generateApiBase());
+        };
+        const data = shouldUseDirectAi()
+          ? await directAiImage(prompt, imagePayload)
+          : await api('/api/ai/image', imagePayload, 120000, generateApiBase());
         generatedImageDataUrl = data.dataUrl;
         addGeneratedImage(generatedImageDataUrl, `封面图：${userPrompt || '默认风景图'}`);
         applyImageAsCover(generatedImageDataUrl);
@@ -1781,7 +1923,9 @@
 
     async function checkCurrentVideoStatus() {
       if (!currentVideoTask) return alert('还没有视频任务。');
-      const data = await api('/api/ai/video-status', currentVideoTask, 60000, currentVideoApiBase);
+      const data = shouldUseDirectAi()
+        ? await directVideoStatus(currentVideoTask)
+        : await api('/api/ai/video-status', currentVideoTask, 60000, currentVideoApiBase);
       const result = data.data || {};
       const status = result.status || result.state || 'unknown';
       const progress = result.progress ?? result.percent ?? '';
@@ -1833,7 +1977,9 @@
       }
       log('开始请求 AI 视频生成...');
       currentVideoApiBase = generateApiBase();
-      const data = await api('/api/ai/video', { prompt }, 120000, currentVideoApiBase);
+      const data = shouldUseDirectAi()
+        ? await directAiVideo(prompt)
+        : await api('/api/ai/video', { prompt }, 120000, currentVideoApiBase);
       if (data.ok === false) {
         log(data.message);
         alert(data.message);
