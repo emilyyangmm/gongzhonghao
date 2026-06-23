@@ -82,7 +82,7 @@ function sendJson(res, status, data) {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Publish-Token',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Publish-Token,X-AI-Key,X-AI-Provider,X-AI-Base-URL,X-AI-Text-Model,X-AI-Image-Model,X-AI-Video-Model',
   });
   res.end(body);
 }
@@ -103,6 +103,17 @@ function requireAuth(req, config) {
 
 function requestAiKey(req) {
   return String(req.headers['x-ai-key'] || '').trim();
+}
+
+function requestAiOptions(req) {
+  return {
+    provider: String(req.headers['x-ai-provider'] || '').trim(),
+    baseUrl: String(req.headers['x-ai-base-url'] || '').trim(),
+    apiKey: requestAiKey(req),
+    textModel: String(req.headers['x-ai-text-model'] || '').trim(),
+    imageModel: String(req.headers['x-ai-image-model'] || '').trim(),
+    videoModel: String(req.headers['x-ai-video-model'] || '').trim(),
+  };
 }
 
 function readBody(req) {
@@ -205,20 +216,32 @@ function markdownToWechatHtml(markdown) {
   return `<section style="max-width: 100%; margin: 0 auto; padding: 4px 0 12px; font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;">${blocks.join('\n')}</section>`;
 }
 
-function getAiConfig(config, apiKeyOverride = '') {
+function getAiConfig(config, options = {}) {
+  const opts = typeof options === 'string' ? { apiKey: options } : (options || {});
   const ai = config.ai || {};
-  const apiKey = String(apiKeyOverride || ai.apiKey || '').trim();
+  const apiKey = String(opts.apiKey || ai.apiKey || '').trim();
   if (!apiKey || apiKey === 'sk-...') {
-    throw new Error('请先在 config.local.json 配置 ai.apiKey');
+    throw new Error('Please enter an AI API key');
   }
   return {
-    baseUrl: String(ai.baseUrl || 'https://apihub.agnes-ai.com/v1').replace(/\/+$/, ''),
+    provider: String(opts.provider || ai.provider || 'agnes').trim().toLowerCase(),
+    baseUrl: String(opts.baseUrl || ai.baseUrl || 'https://apihub.agnes-ai.com/v1').replace(/\/+$/, ''),
     apiKey,
-    textModel: ai.textModel || 'agnes-2.0-flash',
-    imageModel: ai.imageModel || 'agnes-image-2.1-flash',
-    videoModel: ai.videoModel || 'agnes-video-v2.0',
+    textModel: opts.textModel || ai.textModel || 'agnes-2.0-flash',
+    imageModel: opts.imageModel || ai.imageModel || 'agnes-image-2.1-flash',
+    videoModel: opts.videoModel || ai.videoModel || 'agnes-video-v2.0',
     videoEndpoint: ai.videoEndpoint || '',
   };
+}
+
+async function readApiJson(res) {
+  const text = await res.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error('AI endpoint did not return JSON: ' + text.slice(0, 120));
+  }
 }
 
 function extractJsonObject(text) {
@@ -303,34 +326,33 @@ async function dataUrlFromRemoteImage(url) {
 async function generateImage(config, body, apiKeyOverride = '') {
   const ai = getAiConfig(config, apiKeyOverride);
   const prompt = body.prompt?.trim();
-  if (!prompt) throw new Error('图片提示词不能为空');
-  const requestBody = {
-    model: body.model || ai.imageModel,
-    prompt,
-    size: body.size || '1024x1024',
-    return_base64: true,
-  };
-  if (body.negative_prompt) requestBody.negative_prompt = String(body.negative_prompt);
-  const res = await fetch(`${ai.baseUrl}/images/generations`, {
+  if (!prompt) throw new Error('Image prompt is required');
+  const model = body.model || ai.imageModel;
+  const negative = String(body.negative_prompt || '').trim();
+  const images = body.reference_image ? (Array.isArray(body.reference_image) ? body.reference_image : [body.reference_image]) : [];
+  let requestBody;
+  if (ai.provider === 'siliconflow') {
+    requestBody = { model, prompt, image_size: body.size || '1024x1024', num_inference_steps: 4, guidance_scale: 1, num_images_per_prompt: 1, ...(negative ? { negative_prompt: negative } : {}) };
+  } else if (ai.provider === 'volcengine') {
+    requestBody = { model, prompt, size: body.size || '2K', output_format: 'png', watermark: false, ...(images.length > 0 ? { image: images.slice(0, 3) } : {}), ...(negative ? { negative_prompt: negative } : {}) };
+  } else if (ai.provider === 'agnes') {
+    requestBody = { model, prompt: negative ? prompt + ', avoid: ' + negative : prompt, size: body.size || '1024x1024', extra_body: { response_format: 'url', ...(images.length > 0 ? { image: images.slice(0, 5) } : {}) } };
+  } else {
+    requestBody = { model, prompt: negative ? prompt + ', avoid: ' + negative : prompt, size: body.size || '1024x1024', n: 1, ...(images.length > 0 ? { image: images.slice(0, 3) } : {}) };
+  }
+  const res = await fetch(ai.baseUrl + '/images/generations', {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${ai.apiKey}`,
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Authorization': 'Bearer ' + ai.apiKey, 'Content-Type': 'application/json' },
     body: JSON.stringify(requestBody),
   });
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(`AI 图片生成失败：${data.error?.message || res.statusText}`);
-  }
-  const item = data.data?.[0];
-  if (item?.b64_json) {
-    return { ok: true, dataUrl: `data:image/png;base64,${item.b64_json}`, model: body.model || ai.imageModel };
-  }
-  if (item?.url) {
-    return { ok: true, dataUrl: await dataUrlFromRemoteImage(item.url), model: body.model || ai.imageModel };
-  }
-  throw new Error('AI 图片生成失败：没有拿到图片数据');
+  const data = await readApiJson(res);
+  if (!res.ok) throw new Error('AI image generation failed: ' + (data.error?.message || data.message || res.statusText));
+  const item = Array.isArray(data.data) ? data.data[0] : data;
+  const imageUrl = item?.url || item?.image_url || data.url || data.image_url || data.images?.[0]?.url;
+  const b64 = item?.b64_json || data.b64_json;
+  if (b64) return { ok: true, dataUrl: 'data:image/png;base64,' + b64, imageUrl: '', model };
+  if (imageUrl) return { ok: true, dataUrl: await dataUrlFromRemoteImage(imageUrl), imageUrl, model };
+  throw new Error('AI image generation failed: no image returned');
 }
 
 async function generateVideo(config, body, apiKeyOverride = '') {
@@ -595,16 +617,17 @@ async function handleApi(req, res, config) {
 
   if (req.method === 'POST' && req.url === '/api/compose') {
     const body = await readBody(req);
-    const aiKey = requestAiKey(req);
-    if (!aiKey && !requireAuth(req, config)) return sendJson(res, 401, { error: '请填写发布口令，或填写自己的 Agnes API Key' });
+    const aiOptions = requestAiOptions(req);
+    if (!aiOptions.apiKey && !requireAuth(req, config)) return sendJson(res, 401, { error: '请填写发布口令，或填写自己的 Agnes API Key' });
     try {
-      return sendJson(res, 200, await composeArticleWithAi(config, body, aiKey));
+      return sendJson(res, 200, await composeArticleWithAi(config, body, aiOptions));
     } catch (err) {
       return sendJson(res, 502, { error: `AI 文章生成失败：${err.message}` });
     }
   }
 
-  const aiKey = requestAiKey(req);
+  const aiOptions = requestAiOptions(req);
+  const aiKey = aiOptions.apiKey;
   const isAiEndpoint = req.url === '/api/ai/image' || req.url === '/api/ai/video' || req.url === '/api/ai/video-status';
   if (!aiKey && !requireAuth(req, config)) return sendJson(res, 401, { error: isAiEndpoint ? '请填写发布口令，或填写自己的 Agnes API Key' : '发布口令不正确' });
 
@@ -645,17 +668,17 @@ async function handleApi(req, res, config) {
 
   if (req.method === 'POST' && req.url === '/api/ai/image') {
     const body = await readBody(req);
-    return sendJson(res, 200, await generateImage(config, body, aiKey));
+    return sendJson(res, 200, await generateImage(config, body, aiOptions));
   }
 
   if (req.method === 'POST' && req.url === '/api/ai/video') {
     const body = await readBody(req);
-    return sendJson(res, 200, await generateVideo(config, body, aiKey));
+    return sendJson(res, 200, await generateVideo(config, body, aiOptions));
   }
 
   if (req.method === 'POST' && req.url === '/api/ai/video-status') {
     const body = await readBody(req);
-    return sendJson(res, 200, await getVideoStatus(config, body, aiKey));
+    return sendJson(res, 200, await getVideoStatus(config, body, aiOptions));
   }
 
   if (req.method === 'POST' && req.url === '/api/wechat/draft') {

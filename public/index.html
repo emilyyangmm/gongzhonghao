@@ -486,9 +486,30 @@
         <input id="publishBaseUrl" placeholder="本地生成、服务器发布时填：http://106.53.141.12">
         <label>AI生成后端地址</label>
         <input id="generateBaseUrl" placeholder="服务器无法生成时填：http://127.0.0.1:3100">
-        <label>自定义 Agnes API Key</label>
-        <input id="aiApiKey" type="password" placeholder="别人使用时填自己的 Agnes Key；不填则需要发布口令">
-        <div class="hint">别人可填自己的 Agnes Key 生成文章/图片/视频。发布草稿箱仍需要发布口令；页面不保存公众号密钥。</div>
+        <label>AI &#24179;&#21488;</label>
+        <select id="aiProvider" onchange="applyProviderPreset(true)">
+          <option value="agnes">Agnes</option>
+          <option value="volcengine">&#28779;&#23665;</option>
+          <option value="siliconflow">&#30889;&#22522;</option>
+          <option value="custom">&#33258;&#23450;&#20041;</option>
+        </select>
+        <label>AI Base URL</label>
+        <input id="aiBaseUrl" placeholder="https://apihub.agnes-ai.com/v1">
+        <label>&#33258;&#23450;&#20041; API Key</label>
+        <input id="aiApiKey" type="password" placeholder="&#21035;&#20154;&#20351;&#29992;&#26102;&#22635;&#33258;&#24049;&#30340; Key&#65307;&#19981;&#22635;&#21017;&#38656;&#35201;&#21457;&#24067;&#21475;&#20196;">
+        <div class="row">
+          <div>
+            <label>&#25991;&#26412;&#27169;&#22411;</label>
+            <input id="aiTextModel" placeholder="agnes-2.0-flash">
+          </div>
+          <div>
+            <label>&#22270;&#29255;&#27169;&#22411;</label>
+            <input id="aiImageModel" placeholder="agnes-image-2.1-flash">
+          </div>
+        </div>
+        <label>&#35270;&#39057;&#27169;&#22411;</label>
+        <input id="aiVideoModel" placeholder="agnes-video-v2.0">
+        <div class="hint">&#21035;&#20154;&#22635;&#33258;&#24049;&#30340; Key &#21482;&#33021;&#29983;&#25104;&#25991;&#31456;/&#22270;&#29255;/&#35270;&#39057;&#65307;&#21457;&#24067;&#21040;&#20320;&#30340;&#20844;&#20247;&#21495;&#33609;&#31295;&#31665;&#20173;&#38656;&#35201;&#21457;&#24067;&#21475;&#20196;&#12290;</div>
 
         <div class="actions">
           <button class="primary" id="composeBtn" onclick="compose()">AI生成文章</button>
@@ -952,15 +973,64 @@
       return $('generateBaseUrl')?.value.trim() || '';
     }
 
+    const AI_PROVIDER_PRESETS = {
+      agnes: { baseUrl: 'https://apihub.agnes-ai.com/v1', textModel: 'agnes-2.0-flash', imageModel: 'agnes-image-2.1-flash', videoModel: 'agnes-video-v2.0' },
+      volcengine: { baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', textModel: '', imageModel: 'doubao-seedream-5-0-260128', videoModel: '' },
+      siliconflow: { baseUrl: 'https://api.siliconflow.cn/v1', textModel: '', imageModel: 'black-forest-labs/FLUX.1-schnell', videoModel: '' },
+      custom: { baseUrl: '', textModel: '', imageModel: '', videoModel: '' }
+    };
+
+    function aiSettings() {
+      return {
+        provider: $('aiProvider')?.value || 'agnes',
+        baseUrl: $('aiBaseUrl')?.value.trim() || '',
+        apiKey: $('aiApiKey')?.value.trim() || '',
+        textModel: $('aiTextModel')?.value.trim() || '',
+        imageModel: $('aiImageModel')?.value.trim() || '',
+        videoModel: $('aiVideoModel')?.value.trim() || ''
+      };
+    }
+
+    function saveAiSettings() {
+      localStorage.setItem('gongzhonghao_ai_settings', JSON.stringify(aiSettings()));
+    }
+
+    function applyProviderPreset(force = false) {
+      const provider = $('aiProvider')?.value || 'agnes';
+      const preset = AI_PROVIDER_PRESETS[provider] || AI_PROVIDER_PRESETS.agnes;
+      if (force || !$('aiBaseUrl').value.trim()) $('aiBaseUrl').value = preset.baseUrl;
+      if (force || !$('aiTextModel').value.trim()) $('aiTextModel').value = preset.textModel;
+      if (force || !$('aiImageModel').value.trim()) $('aiImageModel').value = preset.imageModel;
+      if (force || !$('aiVideoModel').value.trim()) $('aiVideoModel').value = preset.videoModel;
+      saveAiSettings();
+    }
+
+    function loadAiSettings() {
+      const saved = JSON.parse(localStorage.getItem('gongzhonghao_ai_settings') || '{}');
+      if ($('aiProvider')) $('aiProvider').value = saved.provider || 'agnes';
+      applyProviderPreset(false);
+      if (saved.baseUrl) $('aiBaseUrl').value = saved.baseUrl;
+      if (saved.apiKey) $('aiApiKey').value = saved.apiKey;
+      if (saved.textModel) $('aiTextModel').value = saved.textModel;
+      if (saved.imageModel) $('aiImageModel').value = saved.imageModel;
+      if (saved.videoModel) $('aiVideoModel').value = saved.videoModel;
+      ['aiBaseUrl', 'aiApiKey', 'aiTextModel', 'aiImageModel', 'aiVideoModel'].forEach(id => $(id)?.addEventListener('input', saveAiSettings));
+    }
+
     async function api(path, body = {}, timeout = 30000, baseUrl = '') {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeout);
       try {
         const headers = { 'Content-Type': 'application/json' };
         const token = $('token').value.trim();
-        const aiKey = $('aiApiKey')?.value.trim();
+        const ai = aiSettings();
         if (token) headers['X-Publish-Token'] = token;
-        if (aiKey) headers['X-AI-Key'] = aiKey;
+        if (ai.apiKey) headers['X-AI-Key'] = ai.apiKey;
+        if (ai.provider) headers['X-AI-Provider'] = ai.provider;
+        if (ai.baseUrl) headers['X-AI-Base-URL'] = ai.baseUrl;
+        if (ai.textModel) headers['X-AI-Text-Model'] = ai.textModel;
+        if (ai.imageModel) headers['X-AI-Image-Model'] = ai.imageModel;
+        if (ai.videoModel) headers['X-AI-Video-Model'] = ai.videoModel;
         const res = await fetch(buildApiUrl(path, baseUrl), { method: 'POST', headers, body: JSON.stringify(body), signal: controller.signal });
         const data = await res.json();
         if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
@@ -1811,6 +1881,7 @@
     }
 
     $('log').textContent = '面板已加载。';
+    loadAiSettings();
     checkStatus();
     refreshPreview();
     renderImageLibrary();
