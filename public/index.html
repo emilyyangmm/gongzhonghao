@@ -1063,7 +1063,8 @@
         'Write in Chinese. Do not invent a fixed industry, persona, or career background.',
         'Only use the user provided topic, audience, tone, and points.',
         'Return strict JSON only with fields: title, summary, markdown, imagePrompts.',
-        'In markdown, you may add 3-5 image placeholders using: <!-- image: description -->.'
+        'The title, summary, markdown, imagePrompts, and image placeholder descriptions must all be Simplified Chinese.',
+        'In markdown, you may add 3-5 image placeholders using: <!-- image: 中文图片描述 -->.'
       ].join('\n');
       const user = [
         'Topic: ' + topic,
@@ -1072,7 +1073,7 @@
         'Must include points:',
         points,
         '',
-        'Requirements: title 16-28 Chinese characters; summary 60-120 Chinese characters; body 1200-2200 Chinese characters in Markdown; stay strictly within user input.'
+        'Requirements: title 16-28 Chinese characters; summary 60-120 Chinese characters; body 1200-2200 Chinese characters in Markdown; stay strictly within user input. Image prompts must be practical Simplified Chinese descriptions that ordinary users can read and edit.'
       ].join('\n');
       const data = await directAiFetch('/chat/completions', {
         model: ai.textModel || 'agnes-2.0-flash',
@@ -1876,21 +1877,31 @@
 
     function applyImageAsCover(dataUrl) {
       coverDataUrl = dataUrl;
+      const preview = $('coverPreview');
+      preview.src = dataUrl;
+      preview.style.display = 'block';
       const canvas = $('cover');
       const ctx = canvas.getContext('2d');
       const img = new Image();
       img.onload = () => {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        const scale = Math.max(canvas.width / img.width, canvas.height / img.height);
-        const w = img.width * scale;
-        const h = img.height * scale;
-        ctx.drawImage(img, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
-        coverDataUrl = canvas.toDataURL('image/png');
-        const preview = $('coverPreview');
-        preview.src = coverDataUrl;
-        preview.style.display = 'block';
-        log('已将 AI 图片设为封面。');
+        try {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          const scale = Math.max(canvas.width / img.width, canvas.height / img.height);
+          const w = img.width * scale;
+          const h = img.height * scale;
+          ctx.drawImage(img, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+          coverDataUrl = canvas.toDataURL('image/png');
+          preview.src = coverDataUrl;
+        } catch {
+          coverDataUrl = dataUrl;
+        }
+        log('Cover image set.');
       };
+      img.onerror = () => {
+        coverDataUrl = dataUrl;
+        log('Cover image set.');
+      };
+      if (/^https?:\/\//i.test(dataUrl)) img.crossOrigin = 'anonymous';
       img.src = dataUrl;
     }
 

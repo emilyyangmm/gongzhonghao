@@ -454,9 +454,19 @@ ${bullets.map(item => `- ${item}`).join('\n')}
   };
 }
 
-function parseDataUrl(dataUrl) {
-  const match = String(dataUrl || '').match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
-  if (!match) throw new Error('封面图格式错误，请重新生成封面');
+async function parseImageInput(imageInput) {
+  const value = String(imageInput || '').trim();
+  if (/^https?:\/\//i.test(value)) {
+    const res = await fetch(value, {
+      headers: { 'User-Agent': 'Mozilla/5.0 WechatAgentPanel' },
+    });
+    if (!res.ok) throw new Error('Image download failed: ' + res.status);
+    const mime = res.headers.get('content-type') || 'image/jpeg';
+    const buffer = Buffer.from(await res.arrayBuffer());
+    return { mime, buffer };
+  }
+  const match = value.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!match) throw new Error('Invalid image format. Please regenerate the cover.');
   return {
     mime: match[1],
     buffer: Buffer.from(match[2], 'base64'),
@@ -464,7 +474,7 @@ function parseDataUrl(dataUrl) {
 }
 
 async function uploadContentImage(token, dataUrl, name = 'article-image') {
-  const { mime, buffer } = parseDataUrl(dataUrl);
+  const { mime, buffer } = await parseImageInput(dataUrl);
   const ext = mime.includes('png') ? 'png' : 'jpg';
   const form = new FormData();
   form.append('media', new Blob([buffer], { type: mime }), `${name}.${ext}`);
@@ -538,7 +548,7 @@ async function getAccessToken(config, force = false) {
 }
 
 async function uploadCover(token, coverDataUrl) {
-  const { mime, buffer } = parseDataUrl(coverDataUrl);
+  const { mime, buffer } = await parseImageInput(coverDataUrl);
   const ext = mime.includes('png') ? 'png' : 'jpg';
   const form = new FormData();
   form.append('media', new Blob([buffer], { type: mime }), `cover.${ext}`);
