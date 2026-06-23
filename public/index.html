@@ -484,7 +484,11 @@
         <input id="token" type="password" placeholder="服务器 config.local.json 里的 publishToken">
         <label>发布后端地址</label>
         <input id="publishBaseUrl" placeholder="本地生成、服务器发布时填：http://106.53.141.12">
-        <div class="hint">本地写文生图，发布走服务器。AppSecret 只放服务器配置里，页面不保存公众号密钥。</div>
+        <label>AI生成后端地址</label>
+        <input id="generateBaseUrl" placeholder="服务器无法生成时填：http://127.0.0.1:3100">
+        <label>自定义 Agnes API Key</label>
+        <input id="aiApiKey" type="password" placeholder="别人使用时填自己的 Agnes Key；不填则需要发布口令">
+        <div class="hint">别人可填自己的 Agnes Key 生成文章/图片/视频。发布草稿箱仍需要发布口令；页面不保存公众号密钥。</div>
 
         <div class="actions">
           <button class="primary" id="composeBtn" onclick="compose()">AI生成文章</button>
@@ -630,6 +634,7 @@
     let currentArticleId = '';
     let currentVideoTask = null;
     let currentVideoUrl = '';
+    let currentVideoApiBase = '';
     let videoPollTimer = 0;
 
     function log(message) {
@@ -943,13 +948,19 @@
       return $('publishBaseUrl')?.value.trim() || '';
     }
 
+    function generateApiBase() {
+      return $('generateBaseUrl')?.value.trim() || '';
+    }
+
     async function api(path, body = {}, timeout = 30000, baseUrl = '') {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeout);
       try {
         const headers = { 'Content-Type': 'application/json' };
         const token = $('token').value.trim();
+        const aiKey = $('aiApiKey')?.value.trim();
         if (token) headers['X-Publish-Token'] = token;
+        if (aiKey) headers['X-AI-Key'] = aiKey;
         const res = await fetch(buildApiUrl(path, baseUrl), { method: 'POST', headers, body: JSON.stringify(body), signal: controller.signal });
         const data = await res.json();
         if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
@@ -1107,7 +1118,7 @@
           audience: $('audience').value,
           tone: $('tone').value,
           points: $('points').value
-        }, 150000);
+        }, 150000, generateApiBase());
         $('title').value = data.title;
         $('summary').value = data.summary;
         $('markdown').value = ensureImagePlaceholders(data.markdown, data.imagePrompts || []);
@@ -1484,7 +1495,7 @@
     }
 
     async function requestAiImage(prompt) {
-      return await api('/api/ai/image', { prompt }, 120000);
+      return await api('/api/ai/image', { prompt }, 120000, generateApiBase());
     }
 
     async function generateAiImage(promptOverride = '') {
@@ -1618,7 +1629,7 @@
           prompt,
           size: '1024x768',
           negative_prompt: buildCoverNegativePrompt(userPrompt)
-        }, 120000);
+        }, 120000, generateApiBase());
         generatedImageDataUrl = data.dataUrl;
         addGeneratedImage(generatedImageDataUrl, `封面图：${userPrompt || '默认风景图'}`);
         applyImageAsCover(generatedImageDataUrl);
@@ -1700,7 +1711,7 @@
 
     async function checkCurrentVideoStatus() {
       if (!currentVideoTask) return alert('还没有视频任务。');
-      const data = await api('/api/ai/video-status', currentVideoTask, 60000);
+      const data = await api('/api/ai/video-status', currentVideoTask, 60000, currentVideoApiBase);
       const result = data.data || {};
       const status = result.status || result.state || 'unknown';
       const progress = result.progress ?? result.percent ?? '';
@@ -1751,7 +1762,8 @@
         return;
       }
       log('开始请求 AI 视频生成...');
-      const data = await api('/api/ai/video', { prompt }, 120000);
+      currentVideoApiBase = generateApiBase();
+      const data = await api('/api/ai/video', { prompt }, 120000, currentVideoApiBase);
       if (data.ok === false) {
         log(data.message);
         alert(data.message);
