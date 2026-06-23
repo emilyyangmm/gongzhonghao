@@ -319,6 +319,9 @@
       flex-direction: column;
       gap: 10px;
     }
+    .inline-figure-flow {
+      display: none !important;
+    }
     .figure-slot {
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -435,12 +438,404 @@
       .body { height: auto; }
       .placeholder-list { grid-template-columns: 1fr; }
     }
+
+    /* Open Design polish layer: keep existing logic, improve the working surface. */
+    :root {
+      --bg: #f3f5f7;
+      --panel: #ffffff;
+      --panel-soft: #f8fafb;
+      --line: #dfe5ea;
+      --line-strong: #c8d1d8;
+      --text: #101820;
+      --muted: #667484;
+      --brand: #14967f;
+      --brand2: #236f93;
+      --warn: #b66b2f;
+      --danger: #b91c1c;
+      --ok: #078464;
+      --shadow: 0 18px 46px rgba(16, 24, 32, .07);
+    }
+    body {
+      background:
+        radial-gradient(900px 420px at 8% -6%, rgba(20,150,127,.07), transparent 65%),
+        radial-gradient(850px 380px at 105% 0%, rgba(182,107,47,.055), transparent 60%),
+        linear-gradient(180deg, #f8fafb 0%, #f2f5f7 100%);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+    header {
+      height: 66px;
+      margin: 10px 14px 0;
+      padding: 0 18px;
+      border: 1px solid rgba(223,229,234,.9);
+      border-radius: 18px;
+      background: rgba(255,255,255,.86);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 8px 28px rgba(16,24,32,.045);
+    }
+    .brand { font-size: 18px; letter-spacing: .01em; }
+    .status {
+      min-height: 32px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255,255,255,.9);
+    }
+    .dot.ok { box-shadow: 0 0 0 4px rgba(20,150,127,.12); }
+    main {
+      grid-template-columns: 360px minmax(520px, 1fr) 430px;
+      gap: 16px;
+      padding: 14px;
+      height: calc(100vh - 76px);
+    }
+    section {
+      border-color: rgba(223,229,234,.95);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      background: rgba(255,255,255,.98);
+    }
+    .section-head {
+      height: 52px;
+      padding: 0 16px;
+      background: linear-gradient(180deg, #fff, #fafcfd);
+      font-size: 15px;
+      letter-spacing: .01em;
+    }
+    .body { padding: 16px; }
+    label {
+      margin: 13px 0 7px;
+      color: #596879;
+      font-size: 12px;
+      letter-spacing: .01em;
+    }
+    input, textarea, select {
+      border-color: var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #fff;
+      transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+    }
+    textarea { line-height: 1.7; }
+    input:focus, textarea:focus, select:focus {
+      border-color: rgba(20,150,127,.56);
+      box-shadow: 0 0 0 4px rgba(20,150,127,.11);
+    }
+    .pill {
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(20,150,127,.18);
+      background: rgba(20,150,127,.09);
+      color: #0d6759;
+      font-weight: 800;
+    }
+    .actions {
+      gap: 9px;
+      padding-top: 2px;
+    }
+    button {
+      min-height: 34px;
+      border-radius: 11px;
+      padding: 8px 12px;
+      background: #fff;
+      transition: transform .12s ease, border-color .12s ease, background .12s ease, box-shadow .12s ease;
+    }
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      border-color: rgba(20,150,127,.42);
+      box-shadow: 0 8px 18px rgba(16,24,32,.06);
+    }
+    button:active:not(:disabled) { transform: translateY(0); }
+    button.primary {
+      background: var(--brand);
+      border-color: var(--brand);
+      box-shadow: 0 10px 22px rgba(20,150,127,.18);
+    }
+    button.publish {
+      background: var(--brand2);
+      border-color: var(--brand2);
+      box-shadow: 0 10px 22px rgba(35,111,147,.16);
+    }
+    .hint {
+      color: #6a7888;
+      font-size: 12px;
+      line-height: 1.65;
+    }
+    .log {
+      border: 1px solid rgba(15,23,42,.18);
+      border-radius: 14px;
+      background: #0b1220;
+      color: #d7e8ff;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+    }
+    .log.request-log {
+      margin-top: 14px;
+      max-height: 170px;
+    }
+    .editor-title {
+      margin-bottom: 8px;
+      padding: 12px 0;
+      font-size: 28px;
+      letter-spacing: -.02em;
+    }
+    .editor-summary {
+      min-height: 72px;
+      border-radius: 14px;
+    }
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      margin: 10px 0 12px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: linear-gradient(180deg, #fff, #fafbfc);
+    }
+    .toolbar select,
+    .toolbar input {
+      height: 34px;
+      border-radius: 10px;
+    }
+    .visual-editor {
+      min-height: 430px;
+      border-radius: 18px;
+      padding: 16px;
+      background:
+        linear-gradient(180deg, rgba(248,250,251,.92), rgba(255,255,255,.98)),
+        repeating-linear-gradient(180deg, transparent 0, transparent 31px, rgba(223,229,234,.18) 31px, rgba(223,229,234,.18) 32px);
+    }
+    .visual-block {
+      border-radius: 14px;
+      padding: 10px 12px;
+    }
+    .visual-block:hover,
+    .visual-block.drag-over,
+    .visual-block.active {
+      border-color: rgba(20,150,127,.56);
+      box-shadow: 0 0 0 4px rgba(20,150,127,.10);
+    }
+    .visual-image img,
+    .visual-video video {
+      border-radius: 14px;
+      background: #f4f6f8;
+    }
+    .asset-panel,
+    .history-panel,
+    .video-result {
+      border-radius: 16px;
+      background: linear-gradient(180deg, #fff, #fbfcfd);
+      box-shadow: 0 -12px 26px rgba(16,24,32,.06);
+    }
+    .asset-head,
+    .history-head {
+      padding: 10px 12px;
+      background: #fff;
+    }
+    .asset-content {
+      max-height: 420px;
+      padding: 12px;
+    }
+    .placeholder-list {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .placeholder-item,
+    .figure-slot {
+      border-radius: 14px;
+      background: var(--panel-soft);
+    }
+    .placeholder-item div {
+      height: auto;
+      max-height: 40px;
+    }
+    .image-library {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      max-height: 280px;
+      gap: 10px;
+    }
+    .image-card {
+      border-radius: 14px;
+      transition: transform .12s ease, border-color .12s ease, box-shadow .12s ease;
+    }
+    .image-card:hover {
+      transform: translateY(-1px);
+      border-color: rgba(20,150,127,.42);
+      box-shadow: 0 12px 24px rgba(16,24,32,.08);
+    }
+    .image-card.selected {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 4px rgba(20,150,127,.12);
+    }
+    .image-card img { aspect-ratio: 16 / 10; }
+    .image-card .caption { padding: 8px 9px; }
+    .preview {
+      max-width: 680px;
+      padding: 4px 4px 42px;
+      color: #1e2933;
+    }
+    .preview h1,
+    .preview h2 {
+      margin: 26px 0 12px;
+      padding-left: 12px;
+      border-left: 4px solid var(--brand);
+      color: #0f1720;
+      line-height: 1.35;
+    }
+    .preview h2 { font-size: 22px; }
+    .preview h3 {
+      margin: 24px 0 10px;
+      color: #0d6759;
+      font-size: 18px;
+      line-height: 1.4;
+    }
+    .preview p {
+      margin: 13px 0;
+      line-height: 1.95;
+      font-size: 15px;
+    }
+    .preview blockquote {
+      margin: 16px 0;
+      padding: 13px 15px;
+      border-left-color: rgba(20,150,127,.6);
+      border-radius: 0 14px 14px 0;
+      background: rgba(20,150,127,.07);
+      color: #24443f;
+    }
+    .preview img,
+    .preview video {
+      border-radius: 14px;
+      box-shadow: 0 14px 28px rgba(16,24,32,.08);
+    }
+    .cover-box,
+    .generated-image {
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 14px 28px rgba(16,24,32,.08);
+    }
+    #coverPreview {
+      margin-top: 6px;
+      aspect-ratio: 2.35 / 1;
+      object-fit: cover;
+      background: #eef3f4;
+    }
+    .float-panel {
+      border-radius: 18px;
+      box-shadow: 0 24px 70px rgba(16,24,32,.2);
+    }
+    @media (max-width: 1380px) {
+      main { grid-template-columns: 340px minmax(460px, 1fr) 390px; }
+      .image-library { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 1160px) {
+      header { margin: 8px 10px 0; }
+      main { grid-template-columns: 1fr; height: auto; padding: 10px; }
+      section { min-height: auto; }
+      .body { height: auto; }
+      .placeholder-list,
+      .image-library { grid-template-columns: 1fr 1fr; }
+      .asset-panel { position: static; }
+    }
+    .settings-trigger {
+      min-height: 34px;
+      padding: 0 12px;
+      border-radius: 999px;
+      border-color: rgba(20,150,127,.2);
+      background: rgba(20,150,127,.08);
+      color: #0d6759;
+    }
+    .settings-backdrop {
+      position: fixed;
+      inset: 0;
+      display: none;
+      background: rgba(15, 23, 42, .22);
+      z-index: 40;
+    }
+    .settings-backdrop.open { display: block; }
+    .settings-drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: min(430px, calc(100vw - 28px));
+      height: 100vh;
+      display: none;
+      grid-template-rows: auto 1fr;
+      background: #fff;
+      border-left: 1px solid var(--line);
+      box-shadow: -28px 0 70px rgba(16,24,32,.18);
+      z-index: 41;
+    }
+    .settings-drawer.open { display: grid; }
+    .settings-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 18px 18px 14px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #fff, #fafcfd);
+    }
+    .settings-head strong { font-size: 16px; }
+    .settings-head span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .settings-fields {
+      padding: 16px 18px 22px;
+      overflow: auto;
+    }
+    .settings-field {
+      margin-bottom: 13px;
+    }
+    .settings-field label {
+      margin-top: 0;
+    }
+    .settings-field input,
+    .settings-field select {
+      background: var(--panel-soft);
+    }
+    #publishBtn { display: none; }
+    .preview-publish-bar {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      margin: -2px 0 14px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      background: rgba(255,255,255,.94);
+      backdrop-filter: blur(10px);
+    }
+    .preview-publish-bar button {
+      width: 100%;
+      min-height: 40px;
+    }
+    .preview-publish-bar .hint {
+      margin: 0;
+      text-align: center;
+    }
+    @media (max-width: 680px) {
+      header { height: auto; min-height: 62px; align-items: flex-start; flex-direction: column; gap: 8px; padding: 12px; }
+      .row,
+      .placeholder-list,
+      .image-library,
+      .mini-library { grid-template-columns: 1fr; }
+      .toolbar { position: static; }
+      .editor-title { font-size: 23px; }
+    }
   </style>
 </head>
 <body>
   <header>
     <div class="brand">公众号智能体面板</div>
     <div class="status"><span class="dot" id="statusDot"></span><span id="statusText">检测中</span></div>
+    <button class="settings-trigger" type="button" onclick="openSettingsDrawer()">⚙ 设置</button>
   </header>
 
   <main>
@@ -453,7 +848,15 @@
         <div class="row">
           <div>
             <label>目标读者</label>
-            <input id="audience" value="公众号运营者、内容创作者、小团队负责人">
+            <select id="audience">
+              <option value="公众号运营者、内容创作者、小团队负责人">内容运营 / 创作者</option>
+              <option value="企业老板、管理层、业务负责人">老板 / 管理层</option>
+              <option value="专业从业者、顾问、项目负责人">专业从业者 / 项目负责人</option>
+              <option value="产品经理、开发者、技术团队">产品 / 技术团队</option>
+              <option value="普通用户、泛知识读者、朋友圈读者">普通大众 / 泛知识读者</option>
+              <option value="小红书、短视频、私域运营人群">新媒体 / 私域人群</option>
+              <option value="求职者、转型者、副业探索者">求职 / 转型 / 副业人群</option>
+            </select>
           </div>
           <div>
             <label>语气</label>
@@ -467,15 +870,13 @@
         </div>
 
         <label>必须写进去的要点</label>
-        <textarea id="points" placeholder="一行一个要点。比如：AI生成文章、封面图、正文配图、可视排版、一键保存草稿箱"></textarea>
+        <textarea id="points" placeholder="一行一个要点"></textarea>
 
         <label>封面图提示词</label>
-        <textarea id="coverPrompt" placeholder="例：一张干净爽朗的风景图。AI封面只看这里，不参考文章内容"></textarea>
-        <div class="hint">公众号封面图只按这里生成，不读取文章标题、摘要、正文、目标读者或行业背景。</div>
+        <textarea id="coverPrompt" placeholder="填写封面图提示词"></textarea>
 
         <label>正文插图提示词</label>
-        <textarea id="mediaPrompt" placeholder="例：一张清爽的公众号插图，表现一个工作流从选题到草稿箱的过程"></textarea>
-        <div class="hint">这里用于正文插图，不会影响公众号封面。</div>
+        <textarea id="mediaPrompt" placeholder="填写正文插图提示词"></textarea>
 
         <label>视频提示词</label>
         <textarea id="videoPrompt" placeholder="例：一个简洁的工具演示短视频，展示从选题到保存草稿箱的过程"></textarea>
@@ -604,6 +1005,9 @@
     <section>
       <div class="section-head">发布预览</div>
       <div class="body">
+        <div class="preview-publish-bar">
+          <button class="publish" type="button" onclick="publishDraft()">发布到公众号草稿箱</button>
+        </div>
         <canvas id="cover" width="900" height="383" style="display:none"></canvas>
         <label>当前封面图</label>
         <img id="coverPreview" class="generated-image" alt="当前封面图">
@@ -613,6 +1017,18 @@
       </div>
     </section>
   </main>
+
+  <div id="settingsBackdrop" class="settings-backdrop" onclick="closeSettingsDrawer()"></div>
+  <aside id="settingsDrawer" class="settings-drawer" aria-label="设置">
+    <div class="settings-head">
+      <div>
+        <strong>设置</strong>
+        <span>口令、后端地址、AI 平台和模型放这里。平时不用盯着它。</span>
+      </div>
+      <button type="button" onclick="closeSettingsDrawer()">关闭</button>
+    </div>
+    <div id="settingsFields" class="settings-fields"></div>
+  </aside>
 
   <div id="imageAssistant" class="float-panel">
     <div class="float-head">
@@ -2039,7 +2455,67 @@
     }
 
     $('log').textContent = '面板已加载。';
+    function openSettingsDrawer() {
+      $('settingsBackdrop')?.classList.add('open');
+      $('settingsDrawer')?.classList.add('open');
+    }
+
+    function closeSettingsDrawer() {
+      $('settingsBackdrop')?.classList.remove('open');
+      $('settingsDrawer')?.classList.remove('open');
+    }
+
+    function moveFieldToSettings(id, title) {
+      const el = $(id);
+      const target = $('settingsFields');
+      if (!el || !target || el.dataset.inSettings === '1') return;
+      const oldParent = el.parentElement;
+      let label = el.previousElementSibling;
+      if (!label || label.tagName !== 'LABEL') label = null;
+
+      const box = document.createElement('div');
+      box.className = 'settings-field';
+      const newLabel = document.createElement('label');
+      newLabel.textContent = label ? label.textContent : title;
+      box.appendChild(newLabel);
+      box.appendChild(el);
+      target.appendChild(box);
+      el.dataset.inSettings = '1';
+      if (label) label.remove();
+
+      if (oldParent && oldParent !== document.body && oldParent.children.length === 0) {
+        const row = oldParent.parentElement;
+        oldParent.remove();
+        if (row && row.classList?.contains('row') && row.children.length === 0) row.remove();
+      }
+    }
+
+    function organizeSettingsPanel() {
+      [
+        ['token', '发布口令'],
+        ['publishBaseUrl', '发布后端地址'],
+        ['generateBaseUrl', 'AI 生成后端地址'],
+        ['aiProvider', 'AI 平台'],
+        ['aiBaseUrl', 'AI Base URL'],
+        ['aiApiKey', '自定义 API Key'],
+        ['aiTextModel', '文本模型'],
+        ['aiImageModel', '图片模型'],
+        ['aiVideoModel', '视频模型']
+      ].forEach(([id, title]) => moveFieldToSettings(id, title));
+    }
+
+    function moveLogToRequestPanel() {
+      const logBox = $('log');
+      const requestBody = document.querySelector('main > section:first-child .body');
+      if (!logBox || !requestBody || logBox.dataset.inRequestPanel === '1') return;
+      logBox.classList.add('request-log');
+      requestBody.appendChild(logBox);
+      logBox.dataset.inRequestPanel = '1';
+    }
+
     loadAiSettings();
+    organizeSettingsPanel();
+    moveLogToRequestPanel();
     checkStatus();
     refreshPreview();
     renderImageLibrary();
