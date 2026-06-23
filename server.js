@@ -336,9 +336,9 @@ async function generateImage(config, body, apiKeyOverride = '') {
   } else if (ai.provider === 'volcengine') {
     requestBody = { model, prompt, size: body.size || '2K', output_format: 'png', watermark: false, ...(images.length > 0 ? { image: images.slice(0, 3) } : {}), ...(negative ? { negative_prompt: negative } : {}) };
   } else if (ai.provider === 'agnes') {
-    requestBody = { model, prompt: negative ? prompt + ', avoid: ' + negative : prompt, size: body.size || '1024x1024', extra_body: { response_format: 'url', ...(images.length > 0 ? { image: images.slice(0, 5) } : {}) } };
+    requestBody = { model, prompt, size: body.size || '1024x1024', extra_body: { response_format: 'url', ...(images.length > 0 ? { image: images.slice(0, 5) } : {}) }, ...(negative ? { negative_prompt: negative } : {}) };
   } else {
-    requestBody = { model, prompt: negative ? prompt + ', avoid: ' + negative : prompt, size: body.size || '1024x1024', n: 1, ...(images.length > 0 ? { image: images.slice(0, 3) } : {}) };
+    requestBody = { model, prompt, size: body.size || '1024x1024', n: 1, ...(images.length > 0 ? { image: images.slice(0, 3) } : {}), ...(negative ? { negative_prompt: negative } : {}) };
   }
   const res = await fetch(ai.baseUrl + '/images/generations', {
     method: 'POST',

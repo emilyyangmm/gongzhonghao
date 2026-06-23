@@ -1110,9 +1110,10 @@
       const negative = String(extra.negative_prompt || '').trim();
       const payload = {
         model: extra.model || ai.imageModel || 'agnes-image-2.1-flash',
-        prompt: negative ? prompt + ', avoid: ' + negative : prompt,
+        prompt,
         size: extra.size || '1024x1024',
-        extra_body: { response_format: 'url' }
+        extra_body: { response_format: 'url' },
+        ...(negative ? { negative_prompt: negative } : {})
       };
       const data = await directAiFetch('/images/generations', payload, 150000);
       const item = Array.isArray(data.data) ? data.data[0] : data;
