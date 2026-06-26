@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
@@ -1903,6 +1903,7 @@
           <div class="image-card-actions">
             <button onclick="event.stopPropagation(); insertImageByIndex(${i})">插入</button>
             <button onclick="event.stopPropagation(); useImageAsCoverByIndex(${i})">封面</button>
+            <button onclick="event.stopPropagation(); deleteImageByIndex(${i})">删除</button>
           </div>
         </div>
       `).join('');
@@ -1931,6 +1932,7 @@
           <div class="image-card-actions">
             <button onclick="event.stopPropagation(); insertImageByIndex(${i})">插入</button>
             <button onclick="event.stopPropagation(); useImageAsCoverByIndex(${i})">封面</button>
+            <button onclick="event.stopPropagation(); deleteImageByIndex(${i})">删除</button>
           </div>
         </div>
       `).join('');
@@ -1958,6 +1960,21 @@
       selectedImageIndex = index;
       generatedImageDataUrl = item.dataUrl;
       applyImageAsCover(item.dataUrl);
+    }
+
+    function deleteImageByIndex(index) {
+      const item = generatedImages[index];
+      if (!item) return;
+      generatedImages.splice(index, 1);
+      if (selectedImageIndex === index) {
+        selectedImageIndex = Math.min(index, generatedImages.length - 1);
+      } else if (selectedImageIndex > index) {
+        selectedImageIndex -= 1;
+      }
+      generatedImageDataUrl = generatedImages[selectedImageIndex]?.dataUrl || '';
+      renderImageLibrary();
+      renderAssistantImageLibrary();
+      log(`已从素材库删除图片：${item.prompt || '未命名图片'}`);
     }
 
     function dragImage(event, index) {
@@ -2527,3 +2544,4 @@
   </script>
 </body>
 </html>
+
