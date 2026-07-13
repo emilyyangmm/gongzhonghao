@@ -882,11 +882,9 @@
         <textarea id="videoPrompt" placeholder="例：一个简洁的工具演示短视频，展示从选题到保存草稿箱的过程"></textarea>
 
         <label>发布口令</label>
-        <input id="token" type="password" placeholder="服务器 config.local.json 里的 publishToken">
-        <label>发布后端地址</label>
-        <input id="publishBaseUrl" placeholder="本地生成、服务器发布时填：http://106.53.141.12">
-        <label>AI生成后端地址</label>
-        <input id="generateBaseUrl" placeholder="服务器无法生成时填：http://127.0.0.1:3100">
+        <input id="token" type="password" placeholder="发布到公众号草稿箱时填写">
+        <input id="publishBaseUrl" type="hidden" value="">
+        <input id="generateBaseUrl" type="hidden" value="">
         <label>AI &#24179;&#21488;</label>
         <select id="aiProvider" onchange="applyProviderPreset(true)">
           <option value="agnes">Agnes</option>
@@ -1023,7 +1021,7 @@
     <div class="settings-head">
       <div>
         <strong>设置</strong>
-        <span>口令、后端地址、AI 平台和模型放这里。平时不用盯着它。</span>
+        <span>发布口令和用户自己的 API 配置放这里。后端地址使用线上默认配置。</span>
       </div>
       <button type="button" onclick="closeSettingsDrawer()">关闭</button>
     </div>
@@ -2446,6 +2444,32 @@
       log(`微信连接正常：${data.tokenPreview}`);
     }
 
+    async function collectVideoUploads(markdown) {
+      const matches = [...String(markdown || '').matchAll(/^@\[video(?:\s*:\s*.*?)?\]\((https?:\/\/[^)]+)\)$/gm)];
+      const urls = [...new Set(matches.map(match => match[1]))];
+      const uploads = [];
+      for (const url of urls) {
+        let res;
+        try {
+          res = await fetch(url);
+        } catch {
+          throw new Error('浏览器无法读取 AI 视频文件，暂时不能自动转存微信。请重新生成视频后再试。');
+        }
+        if (!res.ok) throw new Error(`视频下载失败：${res.status}`);
+        const blob = await res.blob();
+        if (!blob.type.startsWith('video/')) throw new Error(`返回的不是视频文件：${blob.type || '未知类型'}`);
+        if (blob.size > 28 * 1024 * 1024) throw new Error('视频超过 28MB，当前版本无法自动上传微信，请生成更短的视频。');
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+        uploads.push({ url, dataUrl });
+      }
+      return uploads;
+    }
+
     async function publishDraft() {
       if (!$('title').value.trim()) return alert('请先填写标题');
       if (!$('markdown').value.trim()) return alert('请先生成或填写正文');
@@ -2454,15 +2478,21 @@
       try {
         log('开始发布到公众号草稿箱...');
         refreshPreview();
+        const videoUploads = await collectVideoUploads($('markdown').value);
+        if (videoUploads.length) log(`正在自动转存 ${videoUploads.length} 个视频到微信素材库...`);
         const data = await api('/api/wechat/draft', {
           title: $('title').value,
           summary: $('summary').value,
           markdown: $('markdown').value,
           html: currentHtml,
-          coverDataUrl
-        }, 60000, publishApiBase());
+          coverDataUrl,
+          videoUploads
+        }, 120000, publishApiBase());
         log(`发布成功：${data.message}`);
         log(`media_id: ${data.mediaId}`);
+        if (data.uploadedVideos?.length) {
+          log(`已自动上传 ${data.uploadedVideos.length} 个视频到微信素材库；打开草稿后在对应位置插入即可。`);
+        }
       } catch (err) {
         log(`发布失败：${err.message}`);
         alert(err.message);
@@ -2510,8 +2540,6 @@
     function organizeSettingsPanel() {
       [
         ['token', '发布口令'],
-        ['publishBaseUrl', '发布后端地址'],
-        ['generateBaseUrl', 'AI 生成后端地址'],
         ['aiProvider', 'AI 平台'],
         ['aiBaseUrl', 'AI Base URL'],
         ['aiApiKey', '自定义 API Key'],

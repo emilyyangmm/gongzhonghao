@@ -1,6 +1,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { downloadRemoteMedia, extensionFromMime } = require('./media-utils');
 
 const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -8,7 +9,7 @@ const CONFIG_PATH = path.join(ROOT, 'config.local.json');
 const EXAMPLE_CONFIG_PATH = path.join(ROOT, 'config.example.json');
 const DATA_DIR = path.join(ROOT, 'data');
 const ARTICLES_PATH = path.join(DATA_DIR, 'articles.json');
-const BODY_LIMIT = 25 * 1024 * 1024;
+const BODY_LIMIT = 45 * 1024 * 1024;
 
 let tokenCache = null;
 
@@ -316,11 +317,8 @@ ${points}
 }
 
 async function dataUrlFromRemoteImage(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`图片下载失败：${res.status}`);
-  const contentType = res.headers.get('content-type') || 'image/png';
-  const buffer = Buffer.from(await res.arrayBuffer());
-  return `data:${contentType};base64,${buffer.toString('base64')}`;
+  const { mime, buffer } = await downloadRemoteMedia(url, 'image');
+  return `data:${mime};base64,${buffer.toString('base64')}`;
 }
 
 async function generateImage(config, body, apiKeyOverride = '') {
@@ -457,13 +455,12 @@ ${bullets.map(item => `- ${item}`).join('\n')}
 async function parseImageInput(imageInput) {
   const value = String(imageInput || '').trim();
   if (/^https?:\/\//i.test(value)) {
-    const res = await fetch(value, {
-      headers: { 'User-Agent': 'Mozilla/5.0 WechatAgentPanel' },
-    });
-    if (!res.ok) throw new Error('Image download failed: ' + res.status);
-    const mime = res.headers.get('content-type') || 'image/jpeg';
-    const buffer = Buffer.from(await res.arrayBuffer());
-    return { mime, buffer };
+    try {
+      const { mime, buffer } = await downloadRemoteMedia(value, 'image');
+      return { mime, buffer };
+    } catch (error) {
+      throw new Error(`图片自动转存微信失败：${error.message}`);
+    }
   }
   const match = value.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
   if (!match) throw new Error('Invalid image format. Please regenerate the cover.');
@@ -475,7 +472,7 @@ async function parseImageInput(imageInput) {
 
 async function uploadContentImage(token, dataUrl, name = 'article-image') {
   const { mime, buffer } = await parseImageInput(dataUrl);
-  const ext = mime.includes('png') ? 'png' : 'jpg';
+  const ext = extensionFromMime(mime, 'image');
   const form = new FormData();
   form.append('media', new Blob([buffer], { type: mime }), `${name}.${ext}`);
 
@@ -492,9 +489,9 @@ async function uploadContentImage(token, dataUrl, name = 'article-image') {
 
 async function replaceInlineDataImages(token, markdown) {
   let index = 0;
-  return await String(markdown || '').replaceAllAsync(/!\[(.*?)\]\((data:image\/[a-zA-Z0-9.+-]+;base64,[^)]+)\)/g, async (full, alt, dataUrl) => {
+  return await String(markdown || '').replaceAllAsync(/!\[(.*?)\]\((data:image\/[a-zA-Z0-9.+-]+;base64,[^)]+|https?:\/\/[^)]+)\)/g, async (full, alt, imageInput) => {
     index += 1;
-    const url = await uploadContentImage(token, dataUrl, `article-image-${index}`);
+    const url = await uploadContentImage(token, imageInput, `article-image-${index}`);
     return `![${alt || '文章配图'}](${url})`;
   });
 }
@@ -549,7 +546,7 @@ async function getAccessToken(config, force = false) {
 
 async function uploadCover(token, coverDataUrl) {
   const { mime, buffer } = await parseImageInput(coverDataUrl);
-  const ext = mime.includes('png') ? 'png' : 'jpg';
+  const ext = extensionFromMime(mime, 'image');
   const form = new FormData();
   form.append('media', new Blob([buffer], { type: mime }), `cover.${ext}`);
 
@@ -564,14 +561,59 @@ async function uploadCover(token, coverDataUrl) {
   return data.media_id;
 }
 
+async function parseVideoInput(videoInput) {
+  const value = String(videoInput || '').trim();
+  const match = value.match(/^data:(video\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (match) {
+    const mime = match[1];
+    return { mime, buffer: Buffer.from(match[2], 'base64'), ext: extensionFromMime(mime, 'video') };
+  }
+  return downloadRemoteMedia(value, 'video');
+}
+
+async function uploadWechatVideo(token, videoInput, title = '视频') {
+  const { mime, buffer, ext } = await parseVideoInput(videoInput);
+  const form = new FormData();
+  form.append('media', new Blob([buffer], { type: mime }), `article-video.${ext}`);
+  form.append('description', JSON.stringify({
+    title: String(title || '视频').slice(0, 30),
+    introduction: '由公众号智能体自动上传的视频素材',
+  }));
+
+  const res = await fetch(`https://api.weixin.qq.com/cgi-bin/material/add_material?access_token=${token}&type=video`, {
+    method: 'POST',
+    body: form,
+  });
+  const data = await res.json();
+  if (!data.media_id) {
+    throw new Error(`视频上传微信素材库失败 [${data.errcode || '-'}]: ${data.errmsg || '未知错误'}`);
+  }
+  return data.media_id;
+}
+
+async function replaceInlineVideos(token, markdown, videoUploads = []) {
+  const uploaded = [];
+  const nextMarkdown = await String(markdown || '').replaceAllAsync(/^@\[video(?:\s*:\s*(.*?))?\]\((https?:\/\/[^)]+)\)$/gm, async (_full, rawTitle, videoUrl) => {
+    const title = String(rawTitle || '视频').trim() || '视频';
+    const browserUpload = Array.isArray(videoUploads)
+      ? videoUploads.find(item => String(item?.url || '') === videoUrl)
+      : null;
+    const mediaId = await uploadWechatVideo(token, browserUpload?.dataUrl || videoUrl, title);
+    uploaded.push({ title, mediaId });
+    return `> 视频《${title}》已自动上传至公众号素材库。打开草稿后，可在此处通过“视频”从素材库插入。`;
+  });
+  return { markdown: nextMarkdown, uploaded };
+}
+
 async function createDraft(config, payload) {
   const token = await getAccessToken(config);
   const thumbMediaId = await uploadCover(token, payload.coverDataUrl);
   const title = String(payload.title || '').trim();
   if (!title) throw new Error('标题不能为空');
 
-  const preparedMarkdown = await replaceInlineDataImages(token, payload.markdown || '');
-  const html = markdownToWechatHtml(preparedMarkdown);
+  const preparedImages = await replaceInlineDataImages(token, payload.markdown || '');
+  const preparedVideos = await replaceInlineVideos(token, preparedImages, payload.videoUploads);
+  const html = markdownToWechatHtml(preparedVideos.markdown);
   const article = {
     title: title.slice(0, 64),
     author: String(payload.author || config.wechat?.author || '').slice(0, 8),
@@ -593,7 +635,7 @@ async function createDraft(config, payload) {
   if (!data.media_id) {
     throw new Error(`草稿创建失败 [${data.errcode || '-'}]: ${data.errmsg || '未知错误'}`);
   }
-  return data;
+  return { ...data, uploadedVideos: preparedVideos.uploaded };
 }
 
 function serveStatic(req, res) {
@@ -697,6 +739,7 @@ async function handleApi(req, res, config) {
     return sendJson(res, 200, {
       ok: true,
       mediaId: data.media_id,
+      uploadedVideos: data.uploadedVideos || [],
       message: '文章已保存到微信公众号草稿箱',
     });
   }
