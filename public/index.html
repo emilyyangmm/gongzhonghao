@@ -1057,6 +1057,7 @@
       const first = location.pathname.split('/').filter(Boolean)[0] || '';
       return ['gongzhonghao', 'mp'].includes(first) ? `/${first}` : '';
     })();
+    const VIDEO_RELAY_URL = 'https://miaomiao-agnes-video-relay.ywxaswd.workers.dev/';
     let coverDataUrl = '';
     let currentHtml = '';
     let generatedImageDataUrl = '';
@@ -2453,9 +2454,10 @@
       for (const url of urls) {
         let res;
         try {
-          res = await fetch(url);
+          const relayUrl = VIDEO_RELAY_URL + '?url=' + encodeURIComponent(url);
+          res = await fetch(relayUrl);
         } catch {
-          throw new Error('浏览器无法读取 AI 视频文件，暂时不能自动转存微信。请重新生成视频后再试。');
+          throw new Error('视频中转服务暂时无法读取 AI 视频文件，请稍后重试。');
         }
         if (!res.ok) throw new Error(`视频下载失败：${res.status}`);
         const blob = await res.blob();
