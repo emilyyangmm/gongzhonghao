@@ -1510,7 +1510,9 @@
 
     async function imageUrlToDataUrl(url) {
       const res = await fetch(url);
+      if (!res.ok) throw new Error(`图片下载失败：${res.status}`);
       const blob = await res.blob();
+      if (!blob.type.startsWith('image/')) throw new Error(`返回的不是图片文件：${blob.type || '未知类型'}`);
       return await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result);
@@ -2470,6 +2472,17 @@
       return uploads;
     }
 
+    async function prepareCoverForPublish(value) {
+      if (!/^https?:\/\//i.test(String(value || ''))) return value;
+      try {
+        const dataUrl = await imageUrlToDataUrl(value);
+        if (!String(dataUrl || '').startsWith('data:image/')) throw new Error('图片格式无效');
+        return dataUrl;
+      } catch {
+        throw new Error('浏览器无法读取 AI 封面图，暂时不能自动转存微信。请重新生成封面后再试。');
+      }
+    }
+
     async function publishDraft() {
       if (!$('title').value.trim()) return alert('请先填写标题');
       if (!$('markdown').value.trim()) return alert('请先生成或填写正文');
@@ -2478,6 +2491,7 @@
       try {
         log('开始发布到公众号草稿箱...');
         refreshPreview();
+        const preparedCoverDataUrl = await prepareCoverForPublish(coverDataUrl);
         const videoUploads = await collectVideoUploads($('markdown').value);
         if (videoUploads.length) log(`正在自动转存 ${videoUploads.length} 个视频到微信素材库...`);
         const data = await api('/api/wechat/draft', {
@@ -2485,7 +2499,7 @@
           summary: $('summary').value,
           markdown: $('markdown').value,
           html: currentHtml,
-          coverDataUrl,
+          coverDataUrl: preparedCoverDataUrl,
           videoUploads
         }, 120000, publishApiBase());
         log(`发布成功：${data.message}`);
