@@ -1528,7 +1528,7 @@
         model: extra.model || ai.imageModel || 'agnes-image-2.1-flash',
         prompt,
         size: extra.size || '1024x1024',
-        extra_body: { response_format: 'url' },
+        extra_body: { response_format: 'b64_json' },
         ...(negative ? { negative_prompt: negative } : {})
       };
       const data = await directAiFetch('/images/generations', payload, 150000);
