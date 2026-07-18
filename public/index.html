@@ -1382,6 +1382,7 @@
     function importPastedArticle() {
       const text = $('pasteInput').value.trim();
       if (!text) return alert('请先粘贴文章内容');
+      currentArticleId = '';
       $('markdown').value = text;
       $('pasteInput').classList.add('source-collapsed');
       refreshPreview();
@@ -1730,9 +1731,10 @@
       if (!panel.classList.contains('source-collapsed')) await loadArticleHistory();
     }
 
-    async function saveCurrentArticle() {
+    async function saveCurrentArticle(silent = false) {
       if (!$('title').value.trim() && !$('markdown').value.trim()) {
-        return alert('先写一点内容再保存。');
+        if (!silent) alert('先写一点内容再保存。');
+        return null;
       }
       try {
         const data = await api('/api/articles/save', {
@@ -1743,11 +1745,15 @@
           coverDataUrl
         }, 30000);
         currentArticleId = data.article.id;
-        log('历史文章已保存。');
+        if (!silent) log('历史文章已保存。');
         if (!$('historyPanel').classList.contains('source-collapsed')) await loadArticleHistory();
+        return data.article;
       } catch (err) {
-        log(`历史文章保存失败：${err.message}`);
-        alert(err.message);
+        if (!silent) {
+          log(`历史文章保存失败：${err.message}`);
+          alert(err.message);
+        }
+        throw err;
       }
     }
 
@@ -1839,6 +1845,7 @@
         const data = shouldUseDirectAi()
           ? await directComposeArticle(composeBody)
           : await api('/api/compose', composeBody, 150000, generateApiBase());
+        currentArticleId = '';
         $('title').value = data.title;
         $('summary').value = data.summary;
         $('markdown').value = ensureImagePlaceholders(data.markdown, data.imagePrompts || []);
@@ -2601,6 +2608,12 @@
         }, 120000, publishApiBase());
         log(`发布成功：${data.message}`);
         log(`media_id: ${data.mediaId}`);
+        try {
+          await saveCurrentArticle(true);
+          log('已自动保存到历史文章。');
+        } catch (saveError) {
+          log(`发布成功，但历史保存失败：${saveError.message}`);
+        }
         if (data.uploadedVideos?.length) {
           log(`已自动上传 ${data.uploadedVideos.length} 个视频到微信素材库；打开草稿后在对应位置插入即可。`);
         }
