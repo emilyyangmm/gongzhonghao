@@ -363,7 +363,29 @@
       white-space: pre-wrap;
       line-height: 1.85;
       outline: none;
+      position: relative;
+      padding-right: 42px;
     }
+    .visual-text-content {
+      min-height: 28px;
+      outline: none;
+    }
+    .visual-text-delete {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      border: 0;
+      border-radius: 50%;
+      background: #dff5ef;
+      color: #087b69;
+      font-size: 18px;
+      line-height: 22px;
+      cursor: pointer;
+    }
+    .visual-text-delete:hover { background: #bfe9de; }
     .visual-image img {
       width: 100%;
       max-height: 460px;
@@ -1160,8 +1182,15 @@
         .replaceAll('<hr>', '<hr style="border:0;border-top:1px solid #d9e2ec;margin:22px 0;">')}</section>`;
     }
 
+    function normalizeImageMarkdown(markdown) {
+      return String(markdown || '').replace(
+        /!\[([^\]]*)\]\s*\(\s*((?:data:image\/[a-zA-Z0-9.+-]+;base64,|https?:\/\/)[^\s)]+)\s*\)/g,
+        (_full, alt, src) => `![${String(alt).replace(/\s+/g, ' ').trim()}](${src})`
+      );
+    }
+
     function parseVisualBlocks(markdown) {
-      const lines = String(markdown || '').split(/\r?\n/);
+      const lines = normalizeImageMarkdown(markdown).split(/\r?\n/);
       const blocks = [];
       let buffer = [];
       const flush = () => {
@@ -1204,13 +1233,14 @@
     }
 
     function syncVisualToMarkdown() {
-      $('markdown').value = visualBlocks.map(visualBlockToMarkdown).filter(Boolean).join('\n\n');
+      $('markdown').value = normalizeImageMarkdown(visualBlocks.map(visualBlockToMarkdown).filter(Boolean).join('\n\n'));
       updatePreviewOnly();
       renderInlineFigureSlots();
     }
 
     function updatePreviewOnly() {
-      const markdown = $('markdown').value;
+      const markdown = normalizeImageMarkdown($('markdown').value);
+      if (markdown !== $('markdown').value) $('markdown').value = markdown;
       currentHtml = wechatHtml(markdown);
       $('preview').innerHTML = markdownToHtml(markdown) || '<p style="color:#607086">暂无内容</p>';
       renderImagePlaceholders();
@@ -1248,7 +1278,10 @@
           `;
         }
         return `
-          <div class="visual-block visual-text ${i === selectedVisualIndex ? 'active' : ''}" draggable="true" contenteditable="true" data-index="${i}" onclick="setActiveVisualBlock(${i})" oninput="updateVisualText(${i}, this.innerText)" ondragstart="startVisualDrag(event, ${i})" ondragover="overVisualBlock(event)" ondragleave="leaveVisualBlock(event)" ondrop="dropVisualBlock(event, ${i})">${escapeHtml(block.text)}</div>
+          <div class="visual-block visual-text ${i === selectedVisualIndex ? 'active' : ''}" draggable="true" data-index="${i}" onclick="setActiveVisualBlock(${i})" ondragstart="startVisualDrag(event, ${i})" ondragover="overVisualBlock(event)" ondragleave="leaveVisualBlock(event)" ondrop="dropVisualBlock(event, ${i})">
+            <div class="visual-text-content" contenteditable="true" oninput="updateVisualText(${i}, this.innerText)">${escapeHtml(block.text)}</div>
+            <button class="visual-text-delete" title="删除此段" aria-label="删除此段" onclick="event.stopPropagation(); removeVisualBlock(${i})">×</button>
+          </div>
         `;
       }).join('');
     }
@@ -1830,7 +1863,9 @@
     }
 
     function refreshPreview() {
-      const markdown = $('markdown').value;
+      const normalizedMarkdown = normalizeImageMarkdown($('markdown').value);
+      if (normalizedMarkdown !== $('markdown').value) $('markdown').value = normalizedMarkdown;
+      const markdown = normalizedMarkdown;
       currentHtml = wechatHtml(markdown);
       $('preview').innerHTML = markdownToHtml(markdown) || '<p style="color:#607086">暂无内容</p>';
       renderImagePlaceholders();
